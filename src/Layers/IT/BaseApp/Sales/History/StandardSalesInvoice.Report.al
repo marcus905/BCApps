@@ -1013,6 +1013,9 @@ report 1306 "Standard Sales - Invoice"
                 {
                 }
             }
+            column(PostedPaymentSchedule_Lbl; PostedPaymentScheduleLbl)
+            {
+            }
             dataitem(PostedPaymentLine; "Posted Payment Lines")
             {
                 DataItemLink = "Code" = field("No.");
@@ -1434,6 +1437,7 @@ report 1306 "Standard Sales - Invoice"
         LocalCurrencyLbl: Label 'Local Currency';
         PageLbl: Label 'Page';
         PaymentMethodDescLbl: Label 'Payment Method';
+        PostedPaymentScheduleLbl: Label 'Payment Schedule';
         PostedShipmentDateLbl: Label 'Shipment Date';
         SalesInvLineDiscLbl: Label 'Discount %';
         SalesInvoiceLbl: Label 'Invoice';
