@@ -1035,6 +1035,9 @@ report 1306 "Standard Sales - Invoice"
                     AutoFormatExpression = Header."Currency Code";
                     AutoFormatType = 1;
                 }
+                column(PostedPaymentLineAmountFormatted; Format(Amount, 0, AutoFormat.ResolveAutoFormat(Enum::"Auto Format"::AmountFormat, Header."Currency Code")))
+                {
+                }
                 column(PostedPaymentLineAmount_Lbl; FieldCaption(Amount))
                 {
                 }
