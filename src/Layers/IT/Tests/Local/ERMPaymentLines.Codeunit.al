@@ -1772,6 +1772,66 @@ codeunit 144164 "ERM Payment Lines"
         exit(BankAccount."No.");
     end;
 
+    [Test]
+    [Scope('OnPrem')]
+    procedure MonthEndInstallmentsFromJanuaryEndOnFollowingMonthEnds()
+    begin
+        VerifyMonthEndInstallments(
+            DMY2Date(31, 1, 2026), DMY2Date(28, 2, 2026), DMY2Date(31, 3, 2026), DMY2Date(30, 4, 2026));
+    end;
+
+    [Test]
+    [Scope('OnPrem')]
+    procedure MonthEndInstallmentsHandleLeapYearFebruary()
+    begin
+        VerifyMonthEndInstallments(
+            DMY2Date(31, 1, 2024), DMY2Date(29, 2, 2024), DMY2Date(31, 3, 2024), DMY2Date(30, 4, 2024));
+    end;
+
+    local procedure VerifyMonthEndInstallments(DocumentDate: Date; FirstDueDate: Date; SecondDueDate: Date; ThirdDueDate: Date)
+    var
+        Customer: Record Customer;
+        PaymentLines: Record "Payment Lines";
+        PaymentTerms: Record "Payment Terms";
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+
+        LibraryERM.CreatePaymentTermsIT(PaymentTerms);
+        CreatePaymentLineWithFormula(PaymentTerms.Code, 33.33, '<CM+1D+CM>');
+        CreatePaymentLineWithFormula(PaymentTerms.Code, 33.33, '<CM+32D+CM>');
+        CreatePaymentLineWithFormula(PaymentTerms.Code, 33.34, '<CM+63D+CM>');
+
+        LibrarySales.CreateCustomer(Customer);
+        LibrarySales.CreateSalesHeader(SalesHeader, SalesHeader."Document Type"::Invoice, Customer."No.");
+        SalesHeader.Validate("Document Date", DocumentDate);
+        SalesHeader.Validate("Payment Terms Code", PaymentTerms.Code);
+        SalesHeader.Modify(true);
+
+        PaymentLines.SetRange("Sales/Purchase", PaymentLines."Sales/Purchase"::Sales);
+        PaymentLines.SetRange(Type, PaymentLines.Type::Invoice);
+        PaymentLines.SetRange(Code, SalesHeader."No.");
+        PaymentLines.FindSet();
+
+        Assert.AreEqual(FirstDueDate, PaymentLines."Due Date", 'Unexpected first installment due date.');
+        PaymentLines.Next();
+        Assert.AreEqual(SecondDueDate, PaymentLines."Due Date", 'Unexpected second installment due date.');
+        PaymentLines.Next();
+        Assert.AreEqual(ThirdDueDate, PaymentLines."Due Date", 'Unexpected third installment due date.');
+    end;
+
+    local procedure CreatePaymentLineWithFormula(PaymentTermsCode: Code[10]; PaymentPct: Decimal; DueDateFormulaText: Text)
+    var
+        PaymentLines: Record "Payment Lines";
+    begin
+        LibraryERM.CreatePaymentLines(
+            PaymentLines, PaymentLines."Sales/Purchase"::" ", PaymentLines.Type::"Payment Terms", PaymentTermsCode, '', 0);
+        Evaluate(PaymentLines."Due Date Calculation", DueDateFormulaText);
+        PaymentLines.Validate("Payment %", PaymentPct);
+        PaymentLines.Validate("Due Date Calculation", PaymentLines."Due Date Calculation");
+        PaymentLines.Modify(true);
+    end;
+
     local procedure CreateBankAccountWithABICode(ABICode: Code[5]): Code[20]
     var
         BankAccount: Record "Bank Account";
