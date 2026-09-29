@@ -33,14 +33,14 @@ codeunit 161370 "Create Payment Terms Lines"
         InsertData(PaymentLines.Type::"Payment Terms", Xx30X2, 20000, 50, DueDateCalculation,
                    DiscountDateCalculation, 0, (0D), (0D), PaymentLines."Sales/Purchase"::" ", '', 0);
 
-        Evaluate(DueDateCalculation, '<30D+CM>');
+        Evaluate(DueDateCalculation, '<CM+1D+CM>');
         InsertData(PaymentLines.Type::"Payment Terms", Xx30X3FM, 10000, 33.33, DueDateCalculation,
                    DiscountDateCalculation, 0, (0D), (0D), PaymentLines."Sales/Purchase"::" ", '', 0);
-        Evaluate(DueDateCalculation, '<60D+CM>');
+        Evaluate(DueDateCalculation, '<CM+32D+CM>');
         InsertData(PaymentLines.Type::"Payment Terms", Xx30X3FM, 20000, 33.33, DueDateCalculation,
                    DiscountDateCalculation, 0, (0D), (0D), PaymentLines."Sales/Purchase"::" ", '', 0);
 
-        Evaluate(DueDateCalculation, '<90D+CM>');
+        Evaluate(DueDateCalculation, '<CM+63D+CM>');
         InsertData(PaymentLines.Type::"Payment Terms", Xx30X3FM, 30000, 33.34, DueDateCalculation,
                    DiscountDateCalculation, 0, (0D), (0D), PaymentLines."Sales/Purchase"::" ", '', 0);
 
