@@ -318,17 +318,17 @@ codeunit 161300 "Create Italian Data"
                 1:
                     begin
                         PaymentLines."Payment %" := 33;
-                        Evaluate(PaymentLines."Due Date Calculation", '<30D + CM>');
+                        Evaluate(PaymentLines."Due Date Calculation", '<CM+1D+CM>');
                     end;
                 2:
                     begin
                         PaymentLines."Payment %" := 33;
-                        Evaluate(PaymentLines."Due Date Calculation", '<60D + CM>');
+                        Evaluate(PaymentLines."Due Date Calculation", '<CM+32D+CM>');
                     end;
                 3:
                     begin
                         PaymentLines."Payment %" := 34;
-                        Evaluate(PaymentLines."Due Date Calculation", '<90D + CM>');
+                        Evaluate(PaymentLines."Due Date Calculation", '<CM+63D+CM>');
                     end;
             end;
             Evaluate(PaymentLines."Discount Date Calculation", '<0D>');
