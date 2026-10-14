@@ -66,6 +66,48 @@ codeunit 144200 "FatturaPA Test"
         DescriptionTxt: Label 'Description Text';
 
     [Test]
+    procedure PostingPreviewFatturaPAAccountingEntriesAreTemporary()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        CurrentSalesHeader: Record "Sales Header";
+        GenJnlPostPreview: Codeunit "Gen. Jnl.-Post Preview";
+        SalesPostYesNo: Codeunit "Sales-Post (Yes/No)";
+        PreviewHandler: Codeunit "Posting Preview Event Handler";
+        VATEntryRef: RecordRef;
+        CustLedgerEntryRef: RecordRef;
+        OriginalSystemId: Guid;
+        OriginalModifiedAt: DateTime;
+    begin
+        // [SCENARIO] Standard sales posting preview exposes accounting entries
+        // without replacing or modifying the unposted source invoice.
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        LibrarySales.FindFirstSalesLine(SalesLine, SalesHeader);
+        OriginalSystemId := SalesHeader.SystemId;
+        OriginalModifiedAt := SalesHeader.SystemModifiedAt;
+
+        BindSubscription(SalesPostYesNo);
+        GenJnlPostPreview.SetContext(SalesPostYesNo, SalesHeader);
+        GenJnlPostPreview.Run();
+        UnbindSubscription(SalesPostYesNo);
+        Assert.IsTrue(GenJnlPostPreview.IsSuccess(), 'Posting preview failed.');
+
+        GenJnlPostPreview.GetPreviewHandler(PreviewHandler);
+        PreviewHandler.GetEntries(Database::"VAT Entry", VATEntryRef);
+        Assert.IsTrue(VATEntryRef.Count() > 0, 'No VAT entries were captured.');
+        PreviewHandler.GetEntries(Database::"Cust. Ledger Entry", CustLedgerEntryRef);
+        Assert.IsTrue(CustLedgerEntryRef.Count() > 0, 'No customer ledger entries were captured.');
+
+        Assert.IsTrue(
+            CurrentSalesHeader.Get(SalesHeader."Document Type", SalesHeader."No."),
+            'Posting preview removed the source invoice.');
+        Assert.AreEqual(OriginalSystemId, CurrentSalesHeader.SystemId, 'Source invoice SystemId changed.');
+        Assert.AreEqual(OriginalModifiedAt, CurrentSalesHeader.SystemModifiedAt, 'Source invoice modification timestamp changed.');
+    end;
+
+    [Test]
     [Scope('OnPrem')]
     procedure ExportSalesInvoice()
     var
