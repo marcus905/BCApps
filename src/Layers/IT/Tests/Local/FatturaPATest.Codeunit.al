@@ -66,6 +66,54 @@ codeunit 144200 "FatturaPA Test"
         DescriptionTxt: Label 'Description Text';
 
     [Test]
+    procedure PrepareAndSerializeUnpostedFatturaPAInvoice()
+    var
+        SalesHeader: Record "Sales Header";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        TempXMLBuffer: Record "XML Buffer" temporary;
+        TempBlob: Codeunit "Temp Blob";
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        ExportFatturaPADocument: Codeunit "Export FatturaPA Document";
+        ClientFileName: Text[250];
+    begin
+        // [SCENARIO] An unposted invoice can be prepared and serialized without
+        // allocating the real FatturaPA progressive number.
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        Assert.IsTrue(TempFatturaHeader.FindFirst(), 'FatturaPA header was not prepared.');
+        Assert.AreEqual('PREVIEW', TempFatturaHeader."Progressive No.", 'Preview progressive number was not preserved.');
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Document);
+        Assert.IsTrue(TempFatturaLine.FindFirst(), 'FatturaPA document lines were not prepared.');
+        TempFatturaLine.Reset();
+
+        ExportFatturaPADocument.GenerateXMLFile(TempBlob, TempFatturaLine, TempFatturaHeader, ClientFileName);
+        LibraryITLocalization.LoadTempXMLBufferFromTempBlob(TempXMLBuffer, TempBlob);
+        AssertCurrentElementValue(
+            TempXMLBuffer,
+            '/p:FatturaElettronica/FatturaElettronicaHeader/DatiTrasmissione/ProgressivoInvio',
+            'PREVIEW');
+    end;
+
+    [Test]
+    procedure PrepareFatturaPARejectsBlankPreviewProgressiveNo()
+    var
+        SalesHeader: Record "Sales Header";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
+
+        asserterror FatturaPAPreviewMgt.PreparePreview(SalesHeader, '', TempFatturaHeader, TempFatturaLine);
+    end;
+
+    [Test]
     procedure PostingPreviewFatturaPAAccountingEntriesAreTemporary()
     var
         SalesHeader: Record "Sales Header";
