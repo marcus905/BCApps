@@ -1123,13 +1123,12 @@ codeunit 12184 "Fattura Doc. Helper"
 
     local procedure InsertFatturaLine(var TempFatturaLine: Record "Fattura Line" temporary; var DocLineNo: Integer; TempFatturaHeader: Record "Fattura Header" temporary; LineRecRef: RecordRef; PricesIncludingVAT: Boolean)
     var
-        VATPostingSetup: Record "VAT Posting Setup";
-        Currency: Record Currency;
         Quantity: Decimal;
         UnitPrice: Decimal;
+        LineAmount: Decimal;
         InvDiscAmountByQty: Decimal;
         LineDiscountPct: Decimal;
-        Amount: Decimal;
+        VATPostingSetup: Record "VAT Posting Setup";
     begin
         if Format(LineRecRef.Field(LineTypeFieldNo).Value) = ' ' then
             exit;
@@ -1141,45 +1140,18 @@ codeunit 12184 "Fattura Doc. Helper"
         TempFatturaLine.Type := Format(LineRecRef.Field(LineTypeFieldNo).Value);
         TempFatturaLine."No." := LineRecRef.Field(NoFieldNo).Value();
         TempFatturaLine.Description := LineRecRef.Field(DescriptionFieldNo).Value();
-
         TempFatturaLine."VAT %" := LineRecRef.Field(VatPercFieldNo).Value();
+
         Quantity := LineRecRef.Field(QuantityFieldNo).Value();
         UnitPrice := LineRecRef.Field(UnitPriceFieldNo).Value();
-        Amount := Quantity * UnitPrice;
-
-        Currency.Initialize(TempFatturaHeader."Currency Code");
-        UnitPrice :=
-            ExchangeToLCYAmount(TempFatturaHeader,
-                CalcForPricesIncludingVAT(
-                UnitPrice, PricesIncludingVAT, TempFatturaLine."VAT %", Currency."Unit-Amount Rounding Precision"));
-        Amount := ExchangeToLCYAmount(TempFatturaHeader, Amount);
-        if Quantity < 0 then
-            TempFatturaLine."Unit Price" := -UnitPrice
-        else begin
-            TempFatturaLine.Quantity := Quantity;
-            TempFatturaLine."Unit of Measure" := LineRecRef.Field(UnitOfMeasureFieldNo).Value();
-            TempFatturaLine."Unit Price" := UnitPrice;
-        end;
-
-        InvDiscAmountByQty :=
-          ExchangeToLCYAmount(
-            TempFatturaHeader, CalcInvDiscAmountDividedByQty(LineRecRef, QuantityFieldNo, LineInvDiscAmountFieldNo));
+        LineAmount := LineRecRef.Field(LineAmountFieldNo).Value();
+        InvDiscAmountByQty := CalcInvDiscAmountDividedByQty(LineRecRef, QuantityFieldNo, LineInvDiscAmountFieldNo);
         LineDiscountPct := LineRecRef.Field(LineDiscountPercFieldNo).Value();
-        if (InvDiscAmountByQty <> 0) or (LineDiscountPct <> 0) then begin
-            TempFatturaLine."Discount Percent" := LineDiscountPct;
-            TempFatturaLine."Discount Amount" := InvDiscAmountByQty;
-        end;
 
-        TempFatturaLine.Amount := LineRecRef.Field(LineAmountFieldNo).Value();
-        if (TempFatturaLine.Amount <> 0) and (InvDiscAmountByQty = 0) and (LineDiscountPct = 0) and (TempFatturaLine."Discount Amount" = 0) then
-            TempFatturaLine.Amount := Round(Amount) - TempFatturaLine."Discount Amount"
-        else
-            TempFatturaLine.Amount :=
-              ExchangeToLCYAmount(
-                TempFatturaHeader, CalcForPricesIncludingVAT(
-                TempFatturaLine.Amount, PricesIncludingVAT, TempFatturaLine."VAT %", Currency."Amount Rounding Precision")) -
-              TempFatturaLine."Discount Amount";
-
+        PopulateFatturaLineAmounts(
+            TempFatturaLine, TempFatturaHeader,
+            Quantity, UnitPrice, LineAmount, InvDiscAmountByQty, LineDiscountPct,
+            LineRecRef.Field(UnitOfMeasureFieldNo).Value(), PricesIncludingVAT);
         if TempFatturaLine."VAT %" = 0 then begin
             GetVATPostingSetup(VATPostingSetup, LineRecRef);
             TempFatturaLine."VAT Transaction Nature" := VATPostingSetup."VAT Transaction Nature";
@@ -1189,6 +1161,56 @@ codeunit 12184 "Fattura Doc. Helper"
         if TempFatturaLine.Type <> '' then
             BuildAttachedToLinesExtTextBuffer(TempFatturaLine, LineRecRef);
         BuildVATExemptionExtTextBuffer(TempFatturaLine, TempFatturaHeader);
+    end;
+
+    /// <summary>
+    /// Shared commercial-line calculation for posted exports and preview.
+    /// Caller supplies its source-specific quantity, monetary values and line metadata.
+    /// </summary>
+    procedure PopulateFatturaLineAmounts(
+        var TempFatturaLine: Record "Fattura Line" temporary;
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        Quantity: Decimal;
+        UnitPrice: Decimal;
+        LineAmount: Decimal;
+        InvDiscAmountByQty: Decimal;
+        LineDiscountPct: Decimal;
+        UnitOfMeasure: Text[50];
+        PricesIncludingVAT: Boolean)
+    var
+        Currency: Record Currency;
+        Amount: Decimal;
+    begin
+        Amount := Quantity * UnitPrice;
+        Currency.Initialize(TempFatturaHeader."Currency Code");
+        UnitPrice := ExchangeToLCYAmount(
+            TempFatturaHeader,
+            CalcForPricesIncludingVAT(UnitPrice, PricesIncludingVAT, TempFatturaLine."VAT %", Currency."Unit-Amount Rounding Precision"));
+        Amount := ExchangeToLCYAmount(TempFatturaHeader, Amount);
+        if Quantity < 0 then
+            TempFatturaLine."Unit Price" := -UnitPrice
+        else begin
+            TempFatturaLine.Quantity := Quantity;
+            TempFatturaLine."Unit of Measure" := UnitOfMeasure;
+            TempFatturaLine."Unit Price" := UnitPrice;
+        end;
+
+        InvDiscAmountByQty := ExchangeToLCYAmount(TempFatturaHeader, InvDiscAmountByQty);
+        if (InvDiscAmountByQty <> 0) or (LineDiscountPct <> 0) then begin
+            TempFatturaLine."Discount Percent" := LineDiscountPct;
+            TempFatturaLine."Discount Amount" := InvDiscAmountByQty;
+        end;
+
+        if (LineAmount <> 0) and (InvDiscAmountByQty = 0) and (LineDiscountPct = 0) and (TempFatturaLine."Discount Amount" = 0) then
+            TempFatturaLine.Amount := Round(Amount)
+        else
+            TempFatturaLine.Amount :=
+                ExchangeToLCYAmount(
+                    TempFatturaHeader,
+                    CalcForPricesIncludingVAT(LineAmount, PricesIncludingVAT, TempFatturaLine."VAT %", Currency."Amount Rounding Precision")) -
+                TempFatturaLine."Discount Amount";
+
+
     end;
 
     local procedure InsertExtTextFatturaLine(var TempFatturaLine: Record "Fattura Line" temporary; LineRecRef: RecordRef; NoValue: Text)
