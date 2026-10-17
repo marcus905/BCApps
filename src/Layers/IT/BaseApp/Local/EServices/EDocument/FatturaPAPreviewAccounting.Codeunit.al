@@ -51,6 +51,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
         var TempDtldCustLedgEntry: Record "Detailed Cust. Ledg. Entry" temporary)
     var
         Amount: Decimal;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
         TempCustLedgEntry.Reset();
         if TempCustLedgEntry.FindSet() then
@@ -59,10 +60,8 @@ codeunit 12281 "FatturaPA Preview Accounting"
                     TempCustLedgEntry."Entry No.",
                     TempDtldCustLedgEntry);
 
-                AddPayment(
-                    TempFatturaLine,
-                    TempCustLedgEntry."Due Date",
-                    Abs(Amount));
+                FatturaDocHelper.InsertPreviewPaymentFatturaLine(
+                    TempFatturaLine, TempCustLedgEntry."Due Date", Abs(Amount));
             until TempCustLedgEntry.Next() = 0;
     end;
 
@@ -84,30 +83,6 @@ codeunit 12281 "FatturaPA Preview Accounting"
             until TempDtldCustLedgEntry.Next() = 0;
 
         exit(Total);
-    end;
-
-    local procedure AddPayment(
-        var TempFatturaLine: Record "Fattura Line" temporary;
-        DueDate: Date;
-        Amount: Decimal)
-    var
-        LineNo: Integer;
-    begin
-        TempFatturaLine.Reset();
-        TempFatturaLine.SetRange(
-            "Line Type",
-            TempFatturaLine."Line Type"::Payment);
-        if TempFatturaLine.FindLast() then
-            LineNo := TempFatturaLine."Line No.";
-
-        TempFatturaLine.Init();
-        TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Payment;
-        TempFatturaLine."Line No." := LineNo + 1;
-        TempFatturaLine."Due Date" := DueDate;
-        TempFatturaLine.Amount := Amount;
-        TempFatturaLine.Insert();
-
-        TempFatturaLine.Reset();
     end;
 
 }
