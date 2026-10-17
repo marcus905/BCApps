@@ -937,6 +937,7 @@ codeunit 12184 "Fattura Doc. Helper"
         VATEntry.SetRange("Posting Date", TempFatturaHeader."Posting Date");
         if VATEntry.FindSet() then
             repeat
+                CollectVATPostingSetup(TempVATPostingSetup, VATEntry);
                 SourceVATEntries := VATEntry;
                 SourceVATEntries.Insert();
             until VATEntry.Next() = 0;
