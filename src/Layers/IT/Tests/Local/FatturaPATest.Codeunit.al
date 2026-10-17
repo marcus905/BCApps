@@ -140,6 +140,60 @@ codeunit 144200 "FatturaPA Test"
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/ImponibileImporto');
         AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta');
+        CompareAdditionalPreviewAndPostedFields(PreviewXML, PostedXML);
+    end;
+
+    local procedure CompareAdditionalPreviewAndPostedFields(
+        var PreviewXML: Record "XML Buffer" temporary;
+        var PostedXML: Record "XML Buffer" temporary)
+    var
+        BodyPath: Text;
+        LinePath: Text;
+        VATPath: Text;
+        PaymentPath: Text;
+    begin
+        BodyPath := '/p:FatturaElettronica/FatturaElettronicaBody';
+        LinePath := BodyPath + '/DatiBeniServizi/DettaglioLinee';
+        VATPath := BodyPath + '/DatiBeniServizi/DatiRiepilogo';
+        PaymentPath := BodyPath + '/DatiPagamento/DettaglioPagamento';
+
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            BodyPath + '/DatiGenerali/DatiGeneraliDocumento/Divisa');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            BodyPath + '/DatiGenerali/DatiGeneraliDocumento/ImportoTotaleDocumento');
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Descrizione');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Quantita');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/UnitaMisura');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/ScontoMaggiorazione/Percentuale');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/ScontoMaggiorazione/Importo');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Natura');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, VATPath + '/Natura');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, VATPath + '/EsigibilitaIVA');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, VATPath + '/RiferimentoNormativo');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, PaymentPath + '/DataScadenzaPagamento');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, PaymentPath + '/ImportoPagamento');
+    end;
+
+    local procedure AssertOptionalPreviewAndPostedElementEqual(
+        var PreviewXML: Record "XML Buffer" temporary;
+        var PostedXML: Record "XML Buffer" temporary;
+        XPath: Text)
+    begin
+        PreviewXML.Reset();
+        PostedXML.Reset();
+        PreviewXML.FindNodesByXPath(PreviewXML, XPath);
+        PostedXML.FindNodesByXPath(PostedXML, XPath);
+        Assert.AreEqual(PostedXML.Count(), PreviewXML.Count(),
+            StrSubstNo('Optional preview/posted XML node counts differ at %1', XPath));
+        if PostedXML.IsEmpty() then
+            exit;
+        PreviewXML.FindSet();
+        PostedXML.FindSet();
+        repeat
+            Assert.AreEqual(PostedXML.Value, PreviewXML.Value,
+                StrSubstNo('Optional preview/posted XML values differ at %1', XPath));
+            PostedXML.Next();
+        until PreviewXML.Next() = 0;
     end;
 
     local procedure AssertPreviewAndPostedElementEqual(
