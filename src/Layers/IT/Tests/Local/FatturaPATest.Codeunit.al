@@ -99,6 +99,54 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PrepareAndSerializeUnpostedFatturaPACreditMemo()
+    var
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
+        VerifyPreparedPreviewXML(SalesHeader, 'TD04');
+    end;
+
+    [Test]
+    procedure PrepareAndSerializeUnpostedFatturaPAOrder()
+    var
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Order);
+        VerifyPreparedPreviewXML(SalesHeader, 'TD01');
+    end;
+
+    local procedure VerifyPreparedPreviewXML(SalesHeader: Record "Sales Header"; ExpectedFatturaDocumentType: Text)
+    var
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        TempXMLBuffer: Record "XML Buffer" temporary;
+        TempBlob: Codeunit "Temp Blob";
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        ExportFatturaPADocument: Codeunit "Export FatturaPA Document";
+        ClientFileName: Text[250];
+    begin
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        Assert.IsTrue(TempFatturaHeader.FindFirst(), 'FatturaPA preview header was not prepared.');
+        Assert.AreEqual('PREVIEW', TempFatturaHeader."Progressive No.", 'Incorrect preview progressive number.');
+        Assert.AreEqual(ExpectedFatturaDocumentType, TempFatturaHeader."Fattura Document Type", 'Incorrect Fattura document type.');
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Document);
+        Assert.IsTrue(TempFatturaLine.FindFirst(), 'No preview document lines were prepared.');
+        TempFatturaLine.Reset();
+
+        ExportFatturaPADocument.GenerateXMLFile(TempBlob, TempFatturaLine, TempFatturaHeader, ClientFileName);
+        LibraryITLocalization.LoadTempXMLBufferFromTempBlob(TempXMLBuffer, TempBlob);
+        AssertCurrentElementValue(
+            TempXMLBuffer,
+            '/p:FatturaElettronica/FatturaElettronicaHeader/DatiTrasmissione/ProgressivoInvio',
+            'PREVIEW');
+    end;
+
+    [Test]
     procedure PrepareFatturaPARejectsBlankPreviewProgressiveNo()
     var
         SalesHeader: Record "Sales Header";
