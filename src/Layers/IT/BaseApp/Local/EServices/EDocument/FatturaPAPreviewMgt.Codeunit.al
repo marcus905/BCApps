@@ -47,7 +47,9 @@ codeunit 12285 "FatturaPA Preview Mgt."
 
         PreviewAccounting.AddVATRows(
             TempFatturaLine,
-            TempVATEntry);
+            TempVATEntry,
+            SalesHeader."Bill-to Customer No.",
+            SalesHeader."Document Type" <> SalesHeader."Document Type"::"Credit Memo");
         if (SalesHeader."Payment Method Code" <> '') and (SalesHeader."Payment Terms Code" <> '') then
             PreviewAccounting.AddPaymentRows(
                 TempFatturaLine,
