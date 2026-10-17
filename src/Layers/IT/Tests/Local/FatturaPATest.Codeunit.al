@@ -99,6 +99,29 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PrepareFatturaPAOrderWithNoQuantityToInvoice()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+    begin
+        // [SCENARIO] A sales order with no quantity to invoice must not
+        // generate a commercial invoice line in the preview.
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Order);
+        LibrarySales.FindFirstSalesLine(SalesLine, SalesHeader);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Document);
+        Assert.RecordCount(TempFatturaLine, 0);
+    end;
+
+    [Test]
     procedure PreparePreviewDoesNotConsumeFatturaPANumberSeries()
     var
         SalesHeader: Record "Sales Header";
