@@ -66,6 +66,40 @@ codeunit 144200 "FatturaPA Test"
         DescriptionTxt: Label 'Description Text';
 
     [Test]
+    procedure PreviewXMLDoesNotAdvanceFatturaPANumberSeries()
+    var
+        SalesHeader: Record "Sales Header";
+        FatturaPANoSeries: Record "No. Series Line";
+        SalesReceivablesSetup: Record "Sales & Receivables Setup";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        PreviewBlob: Codeunit "Temp Blob";
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        ExportFatturaPADocument: Codeunit "Export FatturaPA Document";
+        LastNoUsed: Code[20];
+        ClientFileName: Text[250];
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Invoice);
+
+        SalesReceivablesSetup.Get();
+        SalesReceivablesSetup.TestField("Fattura PA Nos.");
+        FatturaPANoSeries.SetRange("Series Code", SalesReceivablesSetup."Fattura PA Nos.");
+        Assert.IsTrue(FatturaPANoSeries.FindFirst(), 'FatturaPA number series not found.');
+        LastNoUsed := FatturaPANoSeries."Last No. Used";
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        ExportFatturaPADocument.GenerateXMLFile(
+            PreviewBlob, TempFatturaLine, TempFatturaHeader, ClientFileName);
+
+        FatturaPANoSeries.FindFirst();
+        Assert.AreEqual(LastNoUsed, FatturaPANoSeries."Last No. Used",
+            'XML preview advanced the real FatturaPA number series.');
+    end;
+
+    [Test]
     procedure PreviewMatchesPostedInvoiceFatturaPAValues()
     var
         SalesHeader: Record "Sales Header";
