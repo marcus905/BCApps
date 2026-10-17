@@ -42,7 +42,6 @@ codeunit 12281 "FatturaPA Preview Accounting"
 
                 AddPayment(
                     TempFatturaLine,
-                    TempCustLedgEntry."Document Occurrence",
                     TempCustLedgEntry."Due Date",
                     Abs(Amount));
             until TempCustLedgEntry.Next() = 0;
@@ -70,7 +69,6 @@ codeunit 12281 "FatturaPA Preview Accounting"
 
     local procedure AddPayment(
         var TempFatturaLine: Record "Fattura Line" temporary;
-        OccurrenceNo: Integer;
         DueDate: Date;
         Amount: Decimal)
     var
@@ -85,10 +83,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
 
         TempFatturaLine.Init();
         TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Payment;
-        if OccurrenceNo <> 0 then
-            TempFatturaLine."Line No." := OccurrenceNo
-        else
-            TempFatturaLine."Line No." := LineNo + 1;
+        TempFatturaLine."Line No." := LineNo + 1;
         TempFatturaLine."Due Date" := DueDate;
         TempFatturaLine.Amount := Amount;
         TempFatturaLine.Insert();
