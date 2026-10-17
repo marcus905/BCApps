@@ -5,6 +5,7 @@ using Microsoft.Bank.BankAccount;
 using Microsoft.EServices.EDocument;
 using Microsoft.Finance.Currency;
 using Microsoft.Finance.VAT.Ledger;
+using Microsoft.Finance.VAT.Setup;
 using Microsoft.Foundation.PaymentTerms;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
@@ -153,7 +154,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         DocumentLineNo: Integer;
         EffectiveQty: Decimal)
     var
-        Description: Text;
+        VATPostingSetup: Record "VAT Posting Setup";
     begin
         TempFatturaLine.Init();
         TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Document;
@@ -179,6 +180,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaLine."Unit Price" := Abs(SalesLine."Unit Price");
         TempFatturaLine."VAT %" := SalesLine."VAT %";
         TempFatturaLine."Discount Percent" := SalesLine."Line Discount %";
+        if VATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group") then
+            TempFatturaLine."VAT Transaction Nature" := VATPostingSetup."VAT Transaction Nature";
         TempFatturaLine.Insert();
     end;
 
