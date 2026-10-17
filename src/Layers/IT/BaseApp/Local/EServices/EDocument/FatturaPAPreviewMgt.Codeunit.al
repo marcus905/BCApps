@@ -163,10 +163,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaLine.Type := Format(SalesLine.Type);
         TempFatturaLine."No." := SalesLine."No.";
 
-        Description := SalesLine.Description;
-
-        TempFatturaLine.Description :=
-            CopyStr(Description, 1, MaxStrLen(TempFatturaLine.Description));
+        TempFatturaLine.Description := SalesLine.Description;
 
         if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then begin
             TempFatturaLine.Quantity := Abs(EffectiveQty);
