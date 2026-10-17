@@ -95,9 +95,9 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaHeader."Entry Type" := TempFatturaHeader."Entry Type"::Sales;
         case SalesHeader."Document Type" of
             SalesHeader."Document Type"::"Credit Memo":
-                TempFatturaHeader."Document Type" := Enum::"Gen. Journal Document Type"::"Credit Memo".AsInteger();
+                TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::"Credit Memo";
             else
-                TempFatturaHeader."Document Type" := Enum::"Gen. Journal Document Type"::Invoice.AsInteger();
+                TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::Invoice;
         end;
         TempFatturaHeader."Progressive No." := PreviewProgressiveNo;
 
