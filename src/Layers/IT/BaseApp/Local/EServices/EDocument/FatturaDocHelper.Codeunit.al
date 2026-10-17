@@ -952,6 +952,43 @@ codeunit 12184 "Fattura Doc. Helper"
             until VATEntry.Next() = 0;
     end;
 
+    /// <summary>
+    /// Groups source VAT entries using the same aggregation applied to posted VAT entries.
+    /// The caller supplies either posted entries or entries captured by posting preview.
+    /// </summary>
+    procedure AggregateFatturaVATEntries(
+        var SourceVATEntries: Record "VAT Entry" temporary;
+        var AggregatedVATEntries: Record "VAT Entry" temporary)
+    var
+        TempVATPostingSetup: Record "VAT Posting Setup" temporary;
+    begin
+        AggregatedVATEntries.Reset();
+        AggregatedVATEntries.DeleteAll();
+        SourceVATEntries.Reset();
+        if SourceVATEntries.FindSet() then
+            repeat
+                CollectVATPostingSetup(TempVATPostingSetup, SourceVATEntries);
+                if not IsSplitVATSetup(TempVATPostingSetup) then begin
+                    AggregatedVATEntries.Reset();
+                    AggregatedVATEntries.SetRange("VAT %", SourceVATEntries."VAT %");
+                    AggregatedVATEntries.SetRange("VAT Transaction Nature", TempVATPostingSetup."VAT Transaction Nature");
+                    if AggregatedVATEntries.FindFirst() then begin
+                        AggregatedVATEntries.Base += SourceVATEntries.Base + SourceVATEntries."Unrealized Base";
+                        AggregatedVATEntries.Amount += SourceVATEntries.Amount + SourceVATEntries."Unrealized Amount";
+                        AggregatedVATEntries.Modify();
+                    end else begin
+                        AggregatedVATEntries.Init();
+                        AggregatedVATEntries := SourceVATEntries;
+                        AggregatedVATEntries.Base += AggregatedVATEntries."Unrealized Base";
+                        AggregatedVATEntries.Amount += AggregatedVATEntries."Unrealized Amount";
+                        AggregatedVATEntries.Insert();
+                    end;
+                end;
+            until SourceVATEntries.Next() = 0;
+        AggregatedVATEntries.Reset();
+        SourceVATEntries.Reset();
+    end;
+
     local procedure CollectVATPostingSetup(var TempVATPostingSetup: Record "VAT Posting Setup" temporary; VATEntry: Record "VAT Entry")
     var
         VATPostingSetup: Record "VAT Posting Setup";
