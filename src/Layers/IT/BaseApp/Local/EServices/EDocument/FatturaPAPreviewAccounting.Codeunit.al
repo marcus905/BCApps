@@ -22,8 +22,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
         if TempVATEntry.FindSet() then
             repeat
                 VATPostingSetup.Get(TempVATEntry."VAT Bus. Posting Group", TempVATEntry."VAT Prod. Posting Group");
-                begin
-                    if not ((VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
+                if not ((VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
                         ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group"))
                     then begin
                         VATNature := VATPostingSetup."VAT Transaction Nature";
@@ -33,7 +32,6 @@ codeunit 12281 "FatturaPA Preview Accounting"
                             Abs(TempVATEntry.Amount + TempVATEntry."Unrealized Amount"),
                             TempVATEntry."VAT Identifier");
                     end;
-                end;
             until TempVATEntry.Next() = 0;
     end;
 
