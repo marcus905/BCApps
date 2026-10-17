@@ -99,6 +99,27 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PrepareFatturaPAIncludesVATSummaryAndPaymentRows()
+    var
+        SalesHeader: Record "Sales Header";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+    begin
+        // [SCENARIO] Preview posting supplies the VAT summary and
+        // receivables-derived installment entries used by FatturaPA.
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::VAT);
+        Assert.IsTrue(TempFatturaLine.Count() > 0, 'Preview did not generate a VAT summary.');
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Payment);
+        Assert.IsTrue(TempFatturaLine.Count() > 0, 'Preview did not generate payment rows.');
+    end;
+
+    [Test]
     procedure PrepareFatturaPAOrderWithPartialQuantityToInvoice()
     var
         SalesHeader: Record "Sales Header";
