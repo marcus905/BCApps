@@ -9,6 +9,7 @@ using Microsoft.Foundation.PaymentTerms;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.Receivables;
+using Microsoft.Finance.ReceivablesPayables;
 
 codeunit 12285 "FatturaPA Preview Mgt."
 {
@@ -92,6 +93,12 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaHeader."Fattura Stamp" := SalesHeader."Fattura Stamp";
         TempFatturaHeader."Fattura Stamp Amount" := SalesHeader."Fattura Stamp Amount";
         TempFatturaHeader."Entry Type" := TempFatturaHeader."Entry Type"::Sales;
+        case SalesHeader."Document Type" of
+            SalesHeader."Document Type"::"Credit Memo":
+                TempFatturaHeader."Document Type" := Enum::"Gen. Journal Document Type"::"Credit Memo".AsInteger();
+            else
+                TempFatturaHeader."Document Type" := Enum::"Gen. Journal Document Type"::Invoice.AsInteger();
+        end;
         TempFatturaHeader."Progressive No." := PreviewProgressiveNo;
 
         if Customer.IsPublicCompany() then
