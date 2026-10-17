@@ -26,18 +26,13 @@ codeunit 12281 "FatturaPA Preview Accounting"
                 VATPostingSetup.Get(TempVATEntry."VAT Bus. Posting Group", TempVATEntry."VAT Prod. Posting Group");
                 if (VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
                    ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group")
-                then
-                    TempVATEntry.Mark(true)
-                else begin
+                then begin
+                    TempVATEntry.Mark(true);
+                    IsSplitPayment := true;
+                end else
                     VATEntryCount += 1;
-                    if VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT" then
-                        IsSplitPayment := true;
-                end;
             until TempVATEntry.Next() = 0;
 
-        TempVATEntry.MarkedOnly(true);
-        // Marked records are reversed VAT entries excluded by the standard helper.
-        TempVATEntry.MarkedOnly(false);
         TempVATEntry.Reset();
         TempVATEntry.SetRange(Type, TempVATEntry.Type::Sale);
         if TempVATEntry.FindSet() then
