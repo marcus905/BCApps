@@ -4,6 +4,7 @@ using Microsoft.Bank.BankAccount;
 
 using Microsoft.EServices.EDocument;
 using Microsoft.Finance.Currency;
+using Microsoft.Finance.GeneralLedger.Setup;
 using Microsoft.Finance.VAT.Ledger;
 using Microsoft.Finance.VAT.Setup;
 using Microsoft.Foundation.PaymentTerms;
@@ -92,7 +93,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaHeader."Customer Purchase Order No." := SalesHeader."Customer Purchase Order No.";
         TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
         TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
-        TempFatturaHeader."Total Inv. Discount" := SalesHeader."Invoice Discount Amount";
+        TempFatturaHeader."Total Inv. Discount" := ConvertToLCY(SalesHeader, SalesHeader."Invoice Discount Amount");
         TempFatturaHeader."Fattura Stamp" := SalesHeader."Fattura Stamp";
         TempFatturaHeader."Fattura Stamp Amount" := SalesHeader."Fattura Stamp Amount";
         TempFatturaHeader."Entry Type" := TempFatturaHeader."Entry Type"::Sales;
@@ -177,8 +178,9 @@ codeunit 12285 "FatturaPA Preview Mgt."
         end;
 
         TempFatturaLine."Unit of Measure" := SalesLine."Unit of Measure Code";
-        TempFatturaLine."Unit Price" := Abs(SalesLine."Unit Price");
+        TempFatturaLine."Unit Price" := Abs(ConvertToLCY(SalesHeader, SalesLine."Unit Price"));
         TempFatturaLine."VAT %" := SalesLine."VAT %";
+        TempFatturaLine.Amount := Abs(ConvertToLCY(SalesHeader, TempFatturaLine.Amount));
         TempFatturaLine."Discount Percent" := SalesLine."Line Discount %";
         if VATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group") then
             TempFatturaLine."VAT Transaction Nature" := VATPostingSetup."VAT Transaction Nature";
@@ -251,6 +253,22 @@ codeunit 12285 "FatturaPA Preview Mgt."
             TempFatturaHeader."Total Amount" := Abs(TotalAmount);
             TempFatturaHeader.Modify();
         end;
+    end;
+
+    local procedure ConvertToLCY(SalesHeader: Record "Sales Header"; Amount: Decimal): Decimal
+    var
+        Currency: Record Currency;
+        CurrencyExchangeRate: Record "Currency Exchange Rate";
+    begin
+        if SalesHeader."Currency Code" = '' then
+            exit(Amount);
+        Currency.Get(SalesHeader."Currency Code");
+        Currency.InitRoundingPrecision();
+        exit(Round(
+            CurrencyExchangeRate.ExchangeAmtFCYToLCY(
+                ResolvePreviewDate(SalesHeader), SalesHeader."Currency Code",
+                Amount, SalesHeader."Currency Factor"),
+            Currency."Amount Rounding Precision"));
     end;
 
     local procedure ResolvePreviewDate(SalesHeader: Record "Sales Header"): Date
