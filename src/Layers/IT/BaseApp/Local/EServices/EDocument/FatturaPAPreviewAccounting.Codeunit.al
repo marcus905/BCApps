@@ -3,6 +3,7 @@ namespace Microsoft.EServices.EDocument;
 using Microsoft.EServices.EDocument;
 using Microsoft.Finance.ReceivablesPayables;
 using Microsoft.Finance.VAT.Ledger;
+using Microsoft.Finance.VAT.Setup;
 using Microsoft.Sales.Receivables;
 
 codeunit 12281 "FatturaPA Preview Accounting"
@@ -10,19 +11,28 @@ codeunit 12281 "FatturaPA Preview Accounting"
     procedure AddVATRows(
         var TempFatturaLine: Record "Fattura Line" temporary;
         var TempVATEntry: Record "VAT Entry" temporary)
+    var
+        VATPostingSetup: Record "VAT Posting Setup";
+        ReversedVATPostingSetup: Record "VAT Posting Setup";
+        VATNature: Code[4];
     begin
         TempVATEntry.Reset();
         TempVATEntry.SetRange(Type, TempVATEntry.Type::Sale);
 
         if TempVATEntry.FindSet() then
             repeat
-                AccumulateVAT(
-                    TempFatturaLine,
-                    TempVATEntry."VAT %",
-                    TempVATEntry."VAT Transaction Nature",
-                    Abs(TempVATEntry.Base + TempVATEntry."Unrealized Base"),
-                    Abs(TempVATEntry.Amount + TempVATEntry."Unrealized Amount"),
-                    TempVATEntry."VAT Identifier");
+                if VATPostingSetup.Get(TempVATEntry."VAT Bus. Posting Group", TempVATEntry."VAT Prod. Posting Group") then begin
+                    if not ((VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
+                        ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group"))
+                    then begin
+                        VATNature := VATPostingSetup."VAT Transaction Nature";
+                        AccumulateVAT(
+                            TempFatturaLine, TempVATEntry."VAT %", VATNature,
+                            Abs(TempVATEntry.Base + TempVATEntry."Unrealized Base"),
+                            Abs(TempVATEntry.Amount + TempVATEntry."Unrealized Amount"),
+                            TempVATEntry."VAT Identifier");
+                    end;
+                end;
             until TempVATEntry.Next() = 0;
     end;
 
