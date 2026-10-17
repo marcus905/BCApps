@@ -50,10 +50,11 @@ codeunit 12285 "FatturaPA Preview Mgt."
         PreviewAccounting.AddVATRows(
             TempFatturaLine,
             TempVATEntry);
-        PreviewAccounting.AddPaymentRows(
-            TempFatturaLine,
-            TempCustLedgEntry,
-            TempDtldCustLedgEntry);
+        if (SalesHeader."Payment Method Code" <> '') and (SalesHeader."Payment Terms Code" <> '') then
+            PreviewAccounting.AddPaymentRows(
+                TempFatturaLine,
+                TempCustLedgEntry,
+                TempDtldCustLedgEntry);
 
         SetPreviewDocumentTotal(
             TempFatturaHeader,
@@ -90,6 +91,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaHeader."Customer Purchase Order No." := SalesHeader."Customer Purchase Order No.";
         TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
         TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
+        TempFatturaHeader."Total Inv. Discount" := SalesHeader."Invoice Discount Amount";
         TempFatturaHeader."Fattura Stamp" := SalesHeader."Fattura Stamp";
         TempFatturaHeader."Fattura Stamp Amount" := SalesHeader."Fattura Stamp Amount";
         TempFatturaHeader."Entry Type" := TempFatturaHeader."Entry Type"::Sales;
