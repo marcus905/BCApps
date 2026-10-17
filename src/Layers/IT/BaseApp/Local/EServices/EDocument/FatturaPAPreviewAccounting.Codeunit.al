@@ -28,7 +28,8 @@ codeunit 12281 "FatturaPA Preview Accounting"
                             TempFatturaLine, TempVATEntry."VAT %", VATNature,
                             Abs(TempVATEntry.Base + TempVATEntry."Unrealized Base"),
                             Abs(TempVATEntry.Amount + TempVATEntry."Unrealized Amount"),
-                            TempVATEntry."VAT Identifier");
+                            TempVATEntry."VAT Identifier",
+                            TempVATEntry."Unrealized Amount" <> 0);
                     end;
             until TempVATEntry.Next() = 0;
     end;
@@ -104,7 +105,8 @@ codeunit 12281 "FatturaPA Preview Accounting"
         VATNature: Code[4];
         VATBase: Decimal;
         VATAmount: Decimal;
-        VATIdentifier: Code[20])
+        VATIdentifier: Code[20];
+        IsDeferred: Boolean)
     var
         LastLineNo: Integer;
     begin
@@ -137,8 +139,10 @@ codeunit 12281 "FatturaPA Preview Accounting"
         TempFatturaLine."VAT Transaction Nature" := VATNature;
         TempFatturaLine."VAT Base" := VATBase;
         TempFatturaLine."VAT Amount" := VATAmount;
-        // Match standard export's immediate/deferred VAT distinction.
-        TempFatturaLine.Description := 'I';
+        if IsDeferred then
+            TempFatturaLine.Description := 'D'
+        else
+            TempFatturaLine.Description := 'I';
         TempFatturaLine."VAT Nature Description" :=
             CopyStr(VATIdentifier, 1, MaxStrLen(TempFatturaLine."VAT Nature Description"));
         TempFatturaLine.Insert();
