@@ -99,7 +99,7 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
-    procedure PrepareFatturaPAOrderWithNoQuantityToInvoice()
+    procedure PrepareFatturaPAOrderWithPartialQuantityToInvoice()
     var
         SalesHeader: Record "Sales Header";
         SalesLine: Record "Sales Line";
@@ -107,18 +107,20 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
-        // [SCENARIO] A sales order with no quantity to invoice must not
-        // generate a commercial invoice line in the preview.
+        // [SCENARIO] A sales order with partial quantity to invoice must
+        // generate only the invoiced quantity in the preview.
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Order);
         LibrarySales.FindFirstSalesLine(SalesLine, SalesHeader);
-        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Validate("Qty. to Invoice", 2);
         SalesLine.Modify(true);
 
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
         TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Document);
-        Assert.RecordCount(TempFatturaLine, 0);
+        Assert.RecordCount(TempFatturaLine, 1);
+        TempFatturaLine.FindFirst();
+        Assert.AreEqual(2, TempFatturaLine.Quantity, 'Preview line quantity must match quantity to invoice.');
     end;
 
     [Test]
