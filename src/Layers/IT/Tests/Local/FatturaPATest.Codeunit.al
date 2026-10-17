@@ -146,18 +146,21 @@ codeunit 144200 "FatturaPA Test"
         var PreviewXML: Record "XML Buffer" temporary;
         var PostedXML: Record "XML Buffer" temporary;
         XPath: Text)
-    var
-        ExpectedValue: Text;
     begin
         PreviewXML.Reset();
         PostedXML.Reset();
         PreviewXML.FindNodesByXPath(PreviewXML, XPath);
         PostedXML.FindNodesByXPath(PostedXML, XPath);
-        Assert.IsTrue(PreviewXML.FindFirst(), StrSubstNo('Missing preview XML node %1', XPath));
-        Assert.IsTrue(PostedXML.FindFirst(), StrSubstNo('Missing posted XML node %1', XPath));
-        ExpectedValue := PostedXML.Value;
-        Assert.AreEqual(ExpectedValue, PreviewXML.Value,
-            StrSubstNo('Preview and posted FatturaPA differ at %1', XPath));
+        Assert.IsTrue(PreviewXML.Count() > 0, StrSubstNo('Missing preview XML node %1', XPath));
+        Assert.AreEqual(PostedXML.Count(), PreviewXML.Count(),
+            StrSubstNo('Preview and posted XML node counts differ at %1', XPath));
+        PreviewXML.FindSet();
+        PostedXML.FindSet();
+        repeat
+            Assert.AreEqual(PostedXML.Value, PreviewXML.Value,
+                StrSubstNo('Preview and posted FatturaPA differ at %1', XPath));
+            PostedXML.Next();
+        until PreviewXML.Next() = 0;
     end;
 
     [Test]
