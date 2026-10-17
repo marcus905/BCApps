@@ -137,6 +137,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
         TempFatturaLine."VAT Transaction Nature" := VATNature;
         TempFatturaLine."VAT Base" := VATBase;
         TempFatturaLine."VAT Amount" := VATAmount;
+        // Match standard export's immediate/deferred VAT distinction.
         TempFatturaLine.Description := 'I';
         TempFatturaLine."VAT Nature Description" :=
             CopyStr(VATIdentifier, 1, MaxStrLen(TempFatturaLine."VAT Nature Description"));
