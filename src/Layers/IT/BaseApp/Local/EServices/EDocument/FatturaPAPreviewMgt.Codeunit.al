@@ -1,5 +1,6 @@
 namespace Microsoft.EServices.EDocument;
 
+using Microsoft.Bank.BankAccount;
 using Microsoft.Finance.Currency;
 using Microsoft.Finance.VAT.Ledger;
 using Microsoft.Finance.VAT.Setup;
