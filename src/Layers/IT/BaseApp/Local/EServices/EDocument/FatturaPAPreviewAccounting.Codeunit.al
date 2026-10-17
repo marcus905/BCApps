@@ -1,6 +1,5 @@
 namespace Microsoft.EServices.EDocument;
 
-using Microsoft.EServices.EDocument;
 using Microsoft.Finance.ReceivablesPayables;
 using Microsoft.Finance.VAT.Ledger;
 using Microsoft.Finance.VAT.Setup;
@@ -23,8 +22,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
             repeat
                 VATPostingSetup.Get(TempVATEntry."VAT Bus. Posting Group", TempVATEntry."VAT Prod. Posting Group");
                 if not ((VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
-                        ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group"))
-                    then begin
+                    ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group")) then begin
                         VATNature := VATPostingSetup."VAT Transaction Nature";
                         AccumulateVAT(
                             TempFatturaLine, TempVATEntry."VAT %", VATNature,
@@ -103,7 +101,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
     local procedure AccumulateVAT(
         var TempFatturaLine: Record "Fattura Line" temporary;
         VATPercent: Decimal;
-        VATNature: Code[10];
+        VATNature: Code[4];
         VATBase: Decimal;
         VATAmount: Decimal;
         VATIdentifier: Code[20])
@@ -130,6 +128,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
             TempFatturaLine."Line Type"::VAT);
         if TempFatturaLine.FindLast() then
             LastLineNo := TempFatturaLine."Line No.";
+        TempFatturaLine.Reset();
 
         TempFatturaLine.Init();
         TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::VAT;
