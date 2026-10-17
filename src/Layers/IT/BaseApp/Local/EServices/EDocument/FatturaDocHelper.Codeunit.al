@@ -1424,7 +1424,6 @@ codeunit 12184 "Fattura Doc. Helper"
             exit(FatturaDocumentType."No.");
     end;
 
-    [Scope('OnPrem')]
     procedure GetOptionCaptionValue(IntValue: Integer): Text
     var
         SalesLine: Record "Sales Line";
