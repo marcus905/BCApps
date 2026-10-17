@@ -14,10 +14,11 @@ codeunit 12281 "FatturaPA Preview Accounting"
         IsInvoice: Boolean)
     var
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+        AggregatedVATEntries: Record "VAT Entry" temporary;
         VATPostingSetup: Record "VAT Posting Setup";
         ReversedVATPostingSetup: Record "VAT Posting Setup";
-        VATEntryCount: Integer;
         IsSplitPayment: Boolean;
+        VATEntryCount: Integer;
     begin
         TempVATEntry.Reset();
         TempVATEntry.SetRange(Type, TempVATEntry.Type::Sale);
@@ -25,24 +26,21 @@ codeunit 12281 "FatturaPA Preview Accounting"
             repeat
                 VATPostingSetup.Get(TempVATEntry."VAT Bus. Posting Group", TempVATEntry."VAT Prod. Posting Group");
                 if (VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
-                   ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group")
-                then begin
-                    TempVATEntry.Mark(true);
+                   ReversedVATPostingSetup.Get(VATPostingSetup."Reversed VAT Bus. Post. Group", VATPostingSetup."Reversed VAT Prod. Post. Group") then
                     IsSplitPayment := true;
-                end else
-                    VATEntryCount += 1;
             until TempVATEntry.Next() = 0;
 
-        TempVATEntry.Reset();
-        TempVATEntry.SetRange(Type, TempVATEntry.Type::Sale);
-        if TempVATEntry.FindSet() then
+        FatturaDocHelper.AggregateFatturaVATEntries(TempVATEntry, AggregatedVATEntries);
+        VATEntryCount := AggregatedVATEntries.Count();
+        if AggregatedVATEntries.FindSet() then
             repeat
-                if not TempVATEntry.Mark() then
-                    FatturaDocHelper.InsertPreviewVATFatturaLine(
-                        TempFatturaLine, TempVATEntry, CustomerNo, IsInvoice, IsSplitPayment, VATEntryCount);
-            until TempVATEntry.Next() = 0;
-        TempVATEntry.ClearMarks();
-        TempVATEntry.Reset();
+                // Aggregation already included unrealized components.
+                AggregatedVATEntries."Unrealized Base" := 0;
+                AggregatedVATEntries."Unrealized Amount" := 0;
+                FatturaDocHelper.InsertPreviewVATFatturaLine(
+                    TempFatturaLine, AggregatedVATEntries, CustomerNo,
+                    IsInvoice, IsSplitPayment, VATEntryCount);
+            until AggregatedVATEntries.Next() = 0;
     end;
 
     procedure AddPaymentRows(
