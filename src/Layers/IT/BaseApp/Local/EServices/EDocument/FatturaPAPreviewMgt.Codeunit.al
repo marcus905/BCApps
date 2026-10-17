@@ -153,32 +153,38 @@ codeunit 12285 "FatturaPA Preview Mgt."
         DocumentLineNo: Integer;
         EffectiveQty: Decimal)
     var
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
         VATPostingSetup: Record "VAT Posting Setup";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        LineAmount: Decimal;
+        InvoiceDiscountPerUnit: Decimal;
     begin
+        TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
+        TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
+        TempFatturaHeader."Posting Date" := ResolvePreviewDate(SalesHeader);
+
         TempFatturaLine.Init();
         TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Document;
         TempFatturaLine."Line No." := DocumentLineNo;
-        TempFatturaLine.Type := Format(SalesLine.Type);
+        TempFatturaLine.Type := FatturaDocHelper.GetOptionCaptionValue(SalesLine.Type.AsInteger());
         TempFatturaLine."No." := SalesLine."No.";
-
         TempFatturaLine.Description := SalesLine.Description;
-
-        if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then begin
-            TempFatturaLine.Quantity := Abs(EffectiveQty);
-            TempFatturaLine.Amount :=
-                Abs(CalcOrderLineAmountToInvoice(SalesHeader, SalesLine, EffectiveQty));
-        end else begin
-            TempFatturaLine.Quantity := Abs(SalesLine.Quantity);
-            TempFatturaLine.Amount := Abs(SalesLine.Amount);
-        end;
-
-        TempFatturaLine."Unit of Measure" := SalesLine."Unit of Measure Code";
-        TempFatturaLine."Unit Price" := Abs(ConvertToLCY(SalesHeader, SalesLine."Unit Price"));
         TempFatturaLine."VAT %" := SalesLine."VAT %";
-        TempFatturaLine.Amount := Abs(ConvertToLCY(SalesHeader, TempFatturaLine.Amount));
-        TempFatturaLine."Discount Percent" := SalesLine."Line Discount %";
-        if VATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group") then
+
+        LineAmount := SalesLine.Amount;
+        if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then
+            LineAmount := CalcOrderLineAmountToInvoice(SalesHeader, SalesLine, EffectiveQty);
+        if SalesLine.Quantity <> 0 then
+            InvoiceDiscountPerUnit := SalesLine."Inv. Discount Amount" / SalesLine.Quantity;
+        FatturaDocHelper.PopulateFatturaLineAmounts(
+            TempFatturaLine, TempFatturaHeader, EffectiveQty,
+            SalesLine."Unit Price", LineAmount, InvoiceDiscountPerUnit,
+            SalesLine."Line Discount %", SalesLine."Unit of Measure Code",
+            SalesHeader."Prices Including VAT");
+        if TempFatturaLine."VAT %" = 0 then begin
+            VATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group");
             TempFatturaLine."VAT Transaction Nature" := VATPostingSetup."VAT Transaction Nature";
+        end;
         TempFatturaLine.Insert();
     end;
 
