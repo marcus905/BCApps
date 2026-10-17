@@ -924,32 +924,23 @@ codeunit 12184 "Fattura Doc. Helper"
             end;
     end;
 
-    local procedure CollectVATOnLines(var TempVATEntry: Record "VAT Entry" temporary; var TempVATPostingSetup: Record "VAT Posting Setup" temporary; TempFatturaHeader: Record "Fattura Header" temporary)
+    local procedure CollectVATOnLines(
+        var TempVATEntry: Record "VAT Entry" temporary;
+        var TempVATPostingSetup: Record "VAT Posting Setup" temporary;
+        TempFatturaHeader: Record "Fattura Header" temporary)
     var
         VATEntry: Record "VAT Entry";
+        SourceVATEntries: Record "VAT Entry" temporary;
     begin
         VATEntry.SetRange("Document Type", TempFatturaHeader."Document Type");
         VATEntry.SetRange("Document No.", TempFatturaHeader."Document No.");
         VATEntry.SetRange("Posting Date", TempFatturaHeader."Posting Date");
         if VATEntry.FindSet() then
             repeat
-                CollectVATPostingSetup(TempVATPostingSetup, VATEntry);
-                if not IsSplitVATSetup(TempVATPostingSetup) then begin
-                    TempVATEntry.SetRange("VAT %", VATEntry."VAT %");
-                    TempVATEntry.SetRange("VAT Transaction Nature", TempVATPostingSetup."VAT Transaction Nature");
-                    if TempVATEntry.FindFirst() then begin
-                        TempVATEntry.Base += VATEntry.Base + VATEntry."Unrealized Base";
-                        TempVATEntry.Amount += VATEntry.Amount + VATEntry."Unrealized Amount";
-                        TempVATEntry.Modify();
-                    end else begin
-                        TempVATEntry.Init();
-                        TempVATEntry := VATEntry;
-                        TempVATEntry.Base += TempVATEntry."Unrealized Base";
-                        TempVATEntry.Amount += TempVATEntry."Unrealized Amount";
-                        TempVATEntry.Insert();
-                    end;
-                end;
+                SourceVATEntries := VATEntry;
+                SourceVATEntries.Insert();
             until VATEntry.Next() = 0;
+        AggregateFatturaVATEntries(SourceVATEntries, TempVATEntry);
     end;
 
     /// <summary>
