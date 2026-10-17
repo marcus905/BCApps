@@ -116,6 +116,10 @@ codeunit 12281 "FatturaPA Preview Accounting"
             TempFatturaLine."Line Type"::VAT);
         TempFatturaLine.SetRange("VAT %", VATPercent);
         TempFatturaLine.SetRange("VAT Transaction Nature", VATNature);
+        if IsDeferred then
+            TempFatturaLine.SetRange(Description, 'D')
+        else
+            TempFatturaLine.SetRange(Description, 'I');
 
         if TempFatturaLine.FindFirst() then begin
             TempFatturaLine."VAT Base" += VATBase;
