@@ -1204,6 +1204,36 @@ codeunit 12184 "Fattura Doc. Helper"
         end;
     end;
 
+    /// <summary>
+    /// Applies the standard Italian VAT summary rules to a posting-preview VAT entry.
+    /// </summary>
+    procedure InsertPreviewVATFatturaLine(
+        var TempFatturaLine: Record "Fattura Line" temporary;
+        TempVATEntry: Record "VAT Entry" temporary;
+        CustomerNo: Code[20];
+        IsInvoice: Boolean;
+        IsSplitPayment: Boolean;
+        VATEntryCount: Integer)
+    var
+        LastVATLineNo: Integer;
+    begin
+        TempFatturaLine.Reset();
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::VAT);
+        if TempFatturaLine.FindLast() then
+            LastVATLineNo := TempFatturaLine."Line No.";
+        TempFatturaLine.Reset();
+        Clear(TempFatturaLine);
+        TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::VAT;
+        TempFatturaLine."Line No." := LastVATLineNo;
+        InsertVATFatturaLine(TempFatturaLine, IsInvoice, TempVATEntry, CustomerNo, IsSplitPayment, VATEntryCount);
+        TempFatturaLine.Reset();
+    end;
+
+    procedure ExchangePreviewAmountToLCY(TempFatturaHeader: Record "Fattura Header" temporary; Amount: Decimal): Decimal
+    begin
+        exit(ExchangeToLCYAmount(TempFatturaHeader, Amount));
+    end;
+
     local procedure InsertVATFatturaLine(var TempFatturaLine: Record "Fattura Line" temporary; IsInvoice: Boolean; VATEntry: Record "VAT Entry"; CustNo: Code[20]; IsSplitPayment: Boolean; VATEntryCount: Integer)
     var
         VATPostingSetup: Record "VAT Posting Setup";
