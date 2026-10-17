@@ -66,6 +66,101 @@ codeunit 144200 "FatturaPA Test"
         DescriptionTxt: Label 'Description Text';
 
     [Test]
+    procedure PreviewMatchesPostedInvoiceFatturaPAValues()
+    var
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewMatchesPostedCreditMemoFatturaPAValues()
+    var
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
+    var
+        SalesInvoiceHeader: Record "Sales Invoice Header";
+        SalesCrMemoHeader: Record "Sales Cr.Memo Header";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        PreviewXML: Record "XML Buffer" temporary;
+        PostedXML: Record "XML Buffer" temporary;
+        PreviewBlob: Codeunit "Temp Blob";
+        PostedBlob: Codeunit "Temp Blob";
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        ExportFatturaPADocument: Codeunit "Export FatturaPA Document";
+        DocumentNo: Code[20];
+        ClientFileName: Text[250];
+    begin
+        // Prepare and serialize before posting. Posting may assign the final document
+        // number and the real transmission progressive number, which are excluded.
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        ExportFatturaPADocument.GenerateXMLFile(
+            PreviewBlob, TempFatturaLine, TempFatturaHeader, ClientFileName);
+
+        DocumentNo := LibrarySales.PostSalesDocument(SalesHeader, true, true);
+        if SalesHeader."Document Type" = SalesHeader."Document Type"::Invoice then begin
+            SalesInvoiceHeader.Get(DocumentNo);
+            ElectronicDocumentFormat.SendElectronically(
+                PostedBlob, ClientFileName, SalesInvoiceHeader,
+                CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
+        end else begin
+            SalesCrMemoHeader.Get(DocumentNo);
+            ElectronicDocumentFormat.SendElectronically(
+                PostedBlob, ClientFileName, SalesCrMemoHeader,
+                CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
+        end;
+
+        LibraryITLocalization.LoadTempXMLBufferFromTempBlob(PreviewXML, PreviewBlob);
+        LibraryITLocalization.LoadTempXMLBufferFromTempBlob(PostedXML, PostedBlob);
+
+        // Compare fiscally significant values produced by the same serializer,
+        // rather than identifiers assigned by the posting/export workflow.
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            '/p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/TipoDocumento');
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee/PrezzoUnitario');
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee/PrezzoTotale');
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee/AliquotaIVA');
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/ImponibileImporto');
+        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta');
+    end;
+
+    local procedure AssertPreviewAndPostedElementEqual(
+        var PreviewXML: Record "XML Buffer" temporary;
+        var PostedXML: Record "XML Buffer" temporary;
+        XPath: Text)
+    var
+        ExpectedValue: Text;
+    begin
+        PreviewXML.Reset();
+        PostedXML.Reset();
+        PreviewXML.FindNodesByXPath(PreviewXML, XPath);
+        PostedXML.FindNodesByXPath(PostedXML, XPath);
+        Assert.IsTrue(PreviewXML.FindFirst(), StrSubstNo('Missing preview XML node %1', XPath));
+        Assert.IsTrue(PostedXML.FindFirst(), StrSubstNo('Missing posted XML node %1', XPath));
+        ExpectedValue := PostedXML.Value;
+        Assert.AreEqual(ExpectedValue, PreviewXML.Value,
+            StrSubstNo('Preview and posted FatturaPA differ at %1', XPath));
+    end;
+
+    [Test]
     procedure PrepareAndSerializeUnpostedFatturaPAInvoice()
     var
         SalesHeader: Record "Sales Header";
