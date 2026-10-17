@@ -252,18 +252,13 @@ codeunit 12285 "FatturaPA Preview Mgt."
 
     local procedure ConvertToLCY(SalesHeader: Record "Sales Header"; Amount: Decimal): Decimal
     var
-        Currency: Record Currency;
-        CurrencyExchangeRate: Record "Currency Exchange Rate";
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+        TempFatturaHeader: Record "Fattura Header" temporary;
     begin
-        if SalesHeader."Currency Code" = '' then
-            exit(Amount);
-        Currency.Get(SalesHeader."Currency Code");
-        Currency.InitRoundingPrecision();
-        exit(Round(
-            CurrencyExchangeRate.ExchangeAmtFCYToLCY(
-                ResolvePreviewDate(SalesHeader), SalesHeader."Currency Code",
-                Amount, SalesHeader."Currency Factor"),
-            Currency."Amount Rounding Precision"));
+        TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
+        TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
+        TempFatturaHeader."Posting Date" := ResolvePreviewDate(SalesHeader);
+        exit(FatturaDocHelper.ExchangePreviewAmountToLCY(TempFatturaHeader, Amount));
     end;
 
     local procedure ResolvePreviewDate(SalesHeader: Record "Sales Header"): Date
