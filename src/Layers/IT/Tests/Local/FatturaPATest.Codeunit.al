@@ -99,6 +99,34 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PreparePreviewDoesNotConsumeFatturaPANumberSeries()
+    var
+        SalesHeader: Record "Sales Header";
+        FatturaPANoSeries: Record "No. Series Line";
+        SalesReceivablesSetup: Record "Sales & Receivables Setup";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        OriginalLastNoUsed: Code[20];
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
+
+        SalesReceivablesSetup.Get();
+        SalesReceivablesSetup.TestField("Fattura PA Nos.");
+        FatturaPANoSeries.SetRange("Series Code", SalesReceivablesSetup."Fattura PA Nos.");
+        Assert.IsTrue(FatturaPANoSeries.FindFirst(), 'The FatturaPA number series has no lines.');
+        OriginalLastNoUsed := FatturaPANoSeries."Last No. Used";
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+
+        FatturaPANoSeries.FindFirst();
+        Assert.AreEqual(OriginalLastNoUsed, FatturaPANoSeries."Last No. Used", 'Preview consumed a FatturaPA progressive number.');
+    end;
+
+    [Test]
     procedure PrepareAndSerializeUnpostedFatturaPACreditMemo()
     var
         SalesHeader: Record "Sales Header";
