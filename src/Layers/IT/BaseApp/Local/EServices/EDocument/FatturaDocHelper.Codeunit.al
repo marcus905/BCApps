@@ -1229,6 +1229,27 @@ codeunit 12184 "Fattura Doc. Helper"
         TempFatturaLine.Reset();
     end;
 
+    procedure InsertPreviewPaymentFatturaLine(
+        var TempFatturaLine: Record "Fattura Line" temporary;
+        DueDate: Date;
+        Amount: Decimal)
+    var
+        LastLineNo: Integer;
+    begin
+        TempFatturaLine.Reset();
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Payment);
+        if TempFatturaLine.FindLast() then
+            LastLineNo := TempFatturaLine."Line No.";
+        TempFatturaLine.Reset();
+        Clear(TempFatturaLine);
+        TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Payment;
+        TempFatturaLine."Line No." := LastLineNo + 1;
+        TempFatturaLine."Due Date" := DueDate;
+        TempFatturaLine.Amount := Amount;
+        TempFatturaLine.Insert();
+        TempFatturaLine.Reset();
+    end;
+
     procedure ExchangePreviewAmountToLCY(TempFatturaHeader: Record "Fattura Header" temporary; Amount: Decimal): Decimal
     begin
         exit(ExchangeToLCYAmount(TempFatturaHeader, Amount));
