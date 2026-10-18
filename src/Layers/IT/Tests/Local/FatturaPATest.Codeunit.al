@@ -101,6 +101,7 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    [HandlerFunctions('CapturePostedFatturaPAErrors')]
     procedure PreviewMatchesPostedInvoiceFatturaPAValues()
     var
         SalesHeader: Record "Sales Header";
@@ -114,6 +115,7 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    [HandlerFunctions('CapturePostedFatturaPAErrors')]
     procedure PreviewMatchesPostedCreditMemoFatturaPAValues()
     var
         SalesHeader: Record "Sales Header";
@@ -124,6 +126,14 @@ codeunit 144200 "FatturaPA Test"
             CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
         Commit(); // Posting preview runs in a separate transaction.
         ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [PageHandler]
+    procedure CapturePostedFatturaPAErrors(var ErrorMessages: TestPage "Error Messages")
+    begin
+        // Report the standard posted-export validation error instead of failing
+        // with the unhelpful 'Unhandled UI: Page 700' test-runner message.
+        Error('Standard posted FatturaPA export validation: %1', ErrorMessages.Description.Value());
     end;
 
     local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
