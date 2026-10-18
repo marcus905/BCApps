@@ -27,7 +27,7 @@ codeunit 12280 "FatturaPA Preview Collector"
         GenJnlPostPreview.SetContext(SalesPostYesNo, SalesHeader);
 
         ClearLastError();
-        if RunPreview(GenJnlPostPreview) then;
+        if GenJnlPostPreview.Run() then;
         UnbindSubscription(SalesPostYesNo);
 
         if not GenJnlPostPreview.IsSuccess() then
@@ -38,12 +38,6 @@ codeunit 12280 "FatturaPA Preview Collector"
         CopyEntries(Database::"VAT Entry", PreviewHandler, TempVATEntry);
         CopyEntries(Database::"Cust. Ledger Entry", PreviewHandler, TempCustLedgEntry);
         CopyEntries(Database::"Detailed Cust. Ledg. Entry", PreviewHandler, TempDtldCustLedgEntry);
-    end;
-
-    [TryFunction]
-    local procedure RunPreview(var GenJnlPostPreview: Codeunit "Gen. Jnl.-Post Preview")
-    begin
-        GenJnlPostPreview.Run();
     end;
 
     local procedure CopyEntries(
