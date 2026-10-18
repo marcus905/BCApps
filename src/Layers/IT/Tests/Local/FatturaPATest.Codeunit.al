@@ -90,6 +90,7 @@ codeunit 144200 "FatturaPA Test"
         Assert.IsTrue(FatturaPANoSeries.FindFirst(), 'FatturaPA number series not found.');
         LastNoUsed := FatturaPANoSeries."Last No. Used";
 
+        Commit(); // Make test document visible to posting preview.
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
         ExportFatturaPADocument.GenerateXMLFile(
             PreviewBlob, TempFatturaLine, TempFatturaHeader, ClientFileName);
@@ -108,6 +109,7 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
             CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        Commit(); // Posting preview runs in a separate transaction.
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
 
@@ -120,6 +122,7 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
             CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
+        Commit(); // Posting preview runs in a separate transaction.
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
 
@@ -269,6 +272,7 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
 
+        Commit(); // Make test document visible to posting preview.
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
         Assert.IsTrue(TempFatturaHeader.FindFirst(), 'FatturaPA header was not prepared.');
         Assert.AreEqual('PREVIEW', TempFatturaHeader."Progressive No.", 'Preview progressive number was not preserved.');
@@ -292,6 +296,7 @@ codeunit 144200 "FatturaPA Test"
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
+        Commit(); // Make test document visible to posting preview.
         VerifyPreparedPreviewXML(SalesHeader, 'TD04');
     end;
 
@@ -303,6 +308,7 @@ codeunit 144200 "FatturaPA Test"
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Order);
+        Commit(); // Make test document visible to posting preview.
         VerifyPreparedPreviewXML(SalesHeader, 'TD01');
     end;
 
@@ -353,6 +359,7 @@ codeunit 144200 "FatturaPA Test"
         Assert.IsTrue(FatturaPANoSeries.FindFirst(), 'The FatturaPA number series has no lines.');
         OriginalLastNoUsed := FatturaPANoSeries."Last No. Used";
 
+        Commit(); // Make test document visible to posting preview.
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
 
