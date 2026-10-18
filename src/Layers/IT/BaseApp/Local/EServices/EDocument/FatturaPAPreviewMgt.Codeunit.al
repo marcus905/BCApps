@@ -180,7 +180,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         FatturaDocHelper.PopulateFatturaLineAmounts(
             TempFatturaLine, TempFatturaHeader, EffectiveQty,
             SalesLine."Unit Price", LineAmount, InvoiceDiscountPerUnit,
-            SalesLine."Line Discount %", SalesLine."Unit of Measure Code",
+            SalesLine."Line Discount %", SalesLine."Unit of Measure",
             SalesHeader."Prices Including VAT");
         if TempFatturaLine."VAT %" = 0 then begin
             VATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group");
