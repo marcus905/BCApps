@@ -1153,15 +1153,63 @@ codeunit 12184 "Fattura Doc. Helper"
     local procedure InsertFatturaLine(var TempFatturaLine: Record "Fattura Line" temporary; var DocLineNo: Integer; TempFatturaHeader: Record "Fattura Header" temporary; LineRecRef: RecordRef; PricesIncludingVAT: Boolean)
     var
         Quantity: Decimal;
-        UnitPrice: Decimal;
         LineAmount: Decimal;
         InvDiscAmountByQty: Decimal;
-        LineDiscountPct: Decimal;
-        VATPostingSetup: Record "VAT Posting Setup";
     begin
         if Format(LineRecRef.Field(LineTypeFieldNo).Value) = ' ' then
             exit;
 
+        Quantity := LineRecRef.Field(QuantityFieldNo).Value();
+        LineAmount := LineRecRef.Field(LineAmountFieldNo).Value();
+        InvDiscAmountByQty := CalcInvDiscAmountDividedByQty(LineRecRef, QuantityFieldNo, LineInvDiscAmountFieldNo);
+
+        InsertSourceFatturaLine(
+            TempFatturaLine, DocLineNo, TempFatturaHeader, LineRecRef,
+            Quantity, LineAmount, InvDiscAmountByQty, PricesIncludingVAT);
+    end;
+
+    /// <summary>
+    /// Builds a preview commercial line with the same fiscal and extended-text
+    /// processing used by posted sales invoice and credit memo lines.
+    /// Orders can supply the quantity and line amount actually being invoiced.
+    /// </summary>
+    procedure InsertPreviewSalesLine(
+        var TempFatturaLine: Record "Fattura Line" temporary;
+        var DocLineNo: Integer;
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        SalesLine: Record "Sales Line";
+        EffectiveQuantity: Decimal;
+        EffectiveLineAmount: Decimal;
+        PricesIncludingVAT: Boolean)
+    var
+        LineRecRef: RecordRef;
+        InvDiscAmountByQty: Decimal;
+    begin
+        Initialize();
+        if SalesLine.Type = SalesLine.Type::" " then
+            exit;
+
+        LineRecRef.GetTable(SalesLine);
+        if SalesLine.Quantity <> 0 then
+            InvDiscAmountByQty := SalesLine."Inv. Discount Amount" / SalesLine.Quantity;
+
+        InsertSourceFatturaLine(
+            TempFatturaLine, DocLineNo, TempFatturaHeader, LineRecRef,
+            EffectiveQuantity, EffectiveLineAmount, InvDiscAmountByQty, PricesIncludingVAT);
+    end;
+
+    local procedure InsertSourceFatturaLine(
+        var TempFatturaLine: Record "Fattura Line" temporary;
+        var DocLineNo: Integer;
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        LineRecRef: RecordRef;
+        Quantity: Decimal;
+        LineAmount: Decimal;
+        InvDiscAmountByQty: Decimal;
+        PricesIncludingVAT: Boolean)
+    var
+        VATPostingSetup: Record "VAT Posting Setup";
+    begin
         DocLineNo += 1;
         Clear(TempFatturaLine);
         TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Document;
@@ -1171,15 +1219,10 @@ codeunit 12184 "Fattura Doc. Helper"
         TempFatturaLine.Description := LineRecRef.Field(DescriptionFieldNo).Value();
         TempFatturaLine."VAT %" := LineRecRef.Field(VatPercFieldNo).Value();
 
-        Quantity := LineRecRef.Field(QuantityFieldNo).Value();
-        UnitPrice := LineRecRef.Field(UnitPriceFieldNo).Value();
-        LineAmount := LineRecRef.Field(LineAmountFieldNo).Value();
-        InvDiscAmountByQty := CalcInvDiscAmountDividedByQty(LineRecRef, QuantityFieldNo, LineInvDiscAmountFieldNo);
-        LineDiscountPct := LineRecRef.Field(LineDiscountPercFieldNo).Value();
-
         PopulateFatturaLineAmounts(
             TempFatturaLine, TempFatturaHeader,
-            Quantity, UnitPrice, LineAmount, InvDiscAmountByQty, LineDiscountPct,
+            Quantity, LineRecRef.Field(UnitPriceFieldNo).Value(), LineAmount,
+            InvDiscAmountByQty, LineRecRef.Field(LineDiscountPercFieldNo).Value(),
             LineRecRef.Field(UnitOfMeasureFieldNo).Value(), PricesIncludingVAT);
         if TempFatturaLine."VAT %" = 0 then begin
             GetVATPostingSetup(VATPostingSetup, LineRecRef);
