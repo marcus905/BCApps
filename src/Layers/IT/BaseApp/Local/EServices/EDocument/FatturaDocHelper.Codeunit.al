@@ -656,19 +656,74 @@ codeunit 12184 "Fattura Doc. Helper"
 
     local procedure GetTipoDocumento(TempFatturaHeader: Record "Fattura Header" temporary; Customer: Record Customer; FatturaDocType: Variant): Text
     begin
+        // Retain the posted-export setup initialization behavior.
+        exit(ResolveFatturaDocumentType(TempFatturaHeader, Customer, FatturaDocType, true));
+    end;
+
+    /// <summary>
+    /// Sets fiscal identity for a preview without initializing document-type setup
+    /// or obtaining a real transmission progressive number.
+    /// </summary>
+    procedure PopulatePreviewHeaderFiscalIdentity(
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        Customer: Record Customer;
+        FatturaDocType: Variant)
+    begin
+        CompanyInformation.Get();
+        TempFatturaHeader."Fattura Document Type" :=
+            CopyStr(
+                ResolveFatturaDocumentType(TempFatturaHeader, Customer, FatturaDocType, false),
+                1, MaxStrLen(TempFatturaHeader."Fattura Document Type"));
+        TempFatturaHeader."Transmission Type" := GetTransmissionType(Customer);
+    end;
+
+    local procedure ResolveFatturaDocumentType(
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        Customer: Record Customer;
+        FatturaDocType: Variant;
+        InitializeMissingSetup: Boolean): Text
+    var
+        FatturaDocumentType: Record "Fattura Document Type";
+        EmptyCatalogDefault: Code[20];
+    begin
         if Format(FatturaDocType) <> '' then
             exit(Format(FatturaDocType));
 
-        if Customer."VAT Registration No." = CompanyInformation."VAT Registration No." then
-            exit(GetSelfBillingCode());
+        CompanyInformation.Get();
+        if InitializeMissingSetup then
+            InsertFatturaDocumentTypeList();
 
-        case TempFatturaHeader."Document Type" of
-            TempFatturaHeader."Document Type"::Invoice:
-                exit(GetInvoiceCode());
-            TempFatturaHeader."Document Type"::"Credit Memo":
-                exit(GetCrMemoCode());
-            else
-                exit(GetPrepaymentCode());
+        if Customer."VAT Registration No." = CompanyInformation."VAT Registration No." then begin
+            FatturaDocumentType.SetRange("Self-Billing", true);
+            EmptyCatalogDefault := 'TD20';
+        end else
+            case TempFatturaHeader."Document Type" of
+                TempFatturaHeader."Document Type"::Invoice:
+                    begin
+                        FatturaDocumentType.SetRange(Invoice, true);
+                        EmptyCatalogDefault := 'TD01';
+                    end;
+                TempFatturaHeader."Document Type"::"Credit Memo":
+                    begin
+                        FatturaDocumentType.SetRange("Credit Memo", true);
+                        EmptyCatalogDefault := 'TD04';
+                    end;
+                else begin
+                    FatturaDocumentType.SetRange(Prepayment, true);
+                    EmptyCatalogDefault := 'TD02';
+                end;
+            end;
+
+        if FatturaDocumentType.FindFirst() then
+            exit(FatturaDocumentType."No.");
+
+        // The standard initializer seeds precisely these defaults when the whole
+        // catalog is empty. Preview must obtain the same result without inserts.
+        // An existing but incomplete catalog must not silently be overridden.
+        if not InitializeMissingSetup then begin
+            FatturaDocumentType.Reset();
+            if FatturaDocumentType.IsEmpty() then
+                exit(EmptyCatalogDefault);
         end;
     end;
 
