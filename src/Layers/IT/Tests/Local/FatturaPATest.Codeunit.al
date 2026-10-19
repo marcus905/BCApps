@@ -138,6 +138,32 @@ codeunit 144200 "FatturaPA Test"
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
 
+    [Test]
+    procedure PreviewMatchesPostedInvoiceWithExtendedText()
+    var
+        SalesHeader: Record "Sales Header";
+        ItemLine: Record "Sales Line";
+        CommentLine: Record "Sales Line";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        ItemLine.SetRange("Document Type", SalesHeader."Document Type");
+        ItemLine.SetRange("Document No.", SalesHeader."No.");
+        ItemLine.SetRange(Type, ItemLine.Type::Item);
+        ItemLine.FindFirst();
+
+        LibrarySales.CreateSalesLine(
+            CommentLine, SalesHeader, CommentLine.Type::" ", '', 0);
+        CommentLine.Validate(Description, 'FatturaPA preview attached extended text');
+        CommentLine.Validate("Attached to Line No.", ItemLine."Line No.");
+        CommentLine.Modify(true);
+
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
     local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
     var
         SalesInvoiceHeader: Record "Sales Invoice Header";
