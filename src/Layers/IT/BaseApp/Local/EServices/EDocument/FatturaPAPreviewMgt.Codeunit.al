@@ -127,6 +127,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
         SalesLine: Record "Sales Line";
         DocumentLineNo: Integer;
         EffectiveQty: Decimal;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+        TempFatturaHeader: Record "Fattura Header" temporary;
     begin
         SalesLine.SetRange("Document Type", SalesHeader."Document Type");
         SalesLine.SetRange("Document No.", SalesHeader."No.");
@@ -140,53 +142,24 @@ codeunit 12285 "FatturaPA Preview Mgt."
                 if (SalesHeader."Document Type" <> SalesHeader."Document Type"::Order) or
                    (EffectiveQty <> 0)
                 then begin
-                    DocumentLineNo += 1;
-                    AddDocumentLine(SalesHeader, TempFatturaLine, SalesLine, DocumentLineNo, EffectiveQty);
+                    TempFatturaHeader."Customer No" := SalesHeader."Bill-to Customer No.";
+                    TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
+                    TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
+                    TempFatturaHeader."Posting Date" := ResolvePreviewDate(SalesHeader);
+                    FatturaDocHelper.InsertPreviewSalesLine(
+                        TempFatturaLine, DocumentLineNo, TempFatturaHeader, SalesLine,
+                        EffectiveQty, GetEffectiveLineAmount(SalesHeader, SalesLine, EffectiveQty),
+                        SalesHeader."Prices Including VAT");
                 end;
             end;
         until SalesLine.Next() = 0;
     end;
 
-    local procedure AddDocumentLine(
-        SalesHeader: Record "Sales Header";
-        var TempFatturaLine: Record "Fattura Line" temporary;
-        SalesLine: Record "Sales Line";
-        DocumentLineNo: Integer;
-        EffectiveQty: Decimal)
-    var
-        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
-        VATPostingSetup: Record "VAT Posting Setup";
-        TempFatturaHeader: Record "Fattura Header" temporary;
-        LineAmount: Decimal;
-        InvoiceDiscountPerUnit: Decimal;
+    local procedure GetEffectiveLineAmount(SalesHeader: Record "Sales Header"; SalesLine: Record "Sales Line"; EffectiveQty: Decimal): Decimal
     begin
-        TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
-        TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
-        TempFatturaHeader."Posting Date" := ResolvePreviewDate(SalesHeader);
-
-        TempFatturaLine.Init();
-        TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Document;
-        TempFatturaLine."Line No." := DocumentLineNo;
-        TempFatturaLine.Type := FatturaDocHelper.GetOptionCaptionValue(SalesLine.Type.AsInteger());
-        TempFatturaLine."No." := SalesLine."No.";
-        TempFatturaLine.Description := SalesLine.Description;
-        TempFatturaLine."VAT %" := SalesLine."VAT %";
-
-        LineAmount := SalesLine.Amount;
         if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then
-            LineAmount := CalcOrderLineAmountToInvoice(SalesHeader, SalesLine, EffectiveQty);
-        if SalesLine.Quantity <> 0 then
-            InvoiceDiscountPerUnit := SalesLine."Inv. Discount Amount" / SalesLine.Quantity;
-        FatturaDocHelper.PopulateFatturaLineAmounts(
-            TempFatturaLine, TempFatturaHeader, EffectiveQty,
-            SalesLine."Unit Price", LineAmount, InvoiceDiscountPerUnit,
-            SalesLine."Line Discount %", SalesLine."Unit of Measure",
-            SalesHeader."Prices Including VAT");
-        if TempFatturaLine."VAT %" = 0 then begin
-            VATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group");
-            TempFatturaLine."VAT Transaction Nature" := VATPostingSetup."VAT Transaction Nature";
-        end;
-        TempFatturaLine.Insert();
+            exit(CalcOrderLineAmountToInvoice(SalesHeader, SalesLine, EffectiveQty));
+        exit(SalesLine."Line Amount");
     end;
 
     local procedure GetEffectiveQtyToInvoice(
