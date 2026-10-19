@@ -70,6 +70,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         Customer: Record Customer;
         PaymentMethod: Record "Payment Method";
         PaymentTerms: Record "Payment Terms";
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
         Customer.Get(SalesHeader."Bill-to Customer No.");
 
@@ -79,14 +80,6 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaHeader."Posting Date" := ResolvePreviewDate(SalesHeader);
         TempFatturaHeader."Payment Method Code" := SalesHeader."Payment Method Code";
         TempFatturaHeader."Payment Terms Code" := SalesHeader."Payment Terms Code";
-        TempFatturaHeader."Fattura Document Type" := SalesHeader."Fattura Document Type";
-        if TempFatturaHeader."Fattura Document Type" = '' then
-            case SalesHeader."Document Type" of
-                SalesHeader."Document Type"::"Credit Memo":
-                    TempFatturaHeader."Fattura Document Type" := 'TD04';
-                else
-                    TempFatturaHeader."Fattura Document Type" := 'TD01';
-            end;
         TempFatturaHeader."Fattura Project Code" := SalesHeader."Fattura Project Code";
         TempFatturaHeader."Fattura Tender Code" := SalesHeader."Fattura Tender Code";
         TempFatturaHeader."Customer Purchase Order No." := SalesHeader."Customer Purchase Order No.";
@@ -104,10 +97,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
         end;
         TempFatturaHeader."Progressive No." := PreviewProgressiveNo;
 
-        if Customer.IsPublicCompany() then
-            TempFatturaHeader."Transmission Type" := 'FPA12'
-        else
-            TempFatturaHeader."Transmission Type" := 'FPR12';
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(
+            TempFatturaHeader, Customer, SalesHeader."Fattura Document Type");
 
         if PaymentMethod.Get(SalesHeader."Payment Method Code") then
             TempFatturaHeader."Fattura PA Payment Method" :=
