@@ -34,9 +34,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
         VATEntryCount := AggregatedVATEntries.Count();
         if AggregatedVATEntries.FindSet() then
             repeat
-                // Aggregation already included unrealized components.
-                AggregatedVATEntries."Unrealized Base" := 0;
-                AggregatedVATEntries."Unrealized Amount" := 0;
+                // Preserve unrealized VAT metadata for the standard VAT-type logic.
                 FatturaDocHelper.InsertPreviewVATFatturaLine(
                     TempFatturaLine, AggregatedVATEntries, CustomerNo,
                     IsInvoice, IsSplitPayment, VATEntryCount);
