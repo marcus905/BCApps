@@ -956,7 +956,6 @@ codeunit 12184 "Fattura Doc. Helper"
     begin
         AggregatedVATEntries.Reset();
         AggregatedVATEntries.DeleteAll();
-        SourceVATEntries.Reset();
         if SourceVATEntries.FindSet() then
             repeat
                 CollectVATPostingSetup(TempVATPostingSetup, SourceVATEntries);
@@ -978,7 +977,6 @@ codeunit 12184 "Fattura Doc. Helper"
                 end;
             until SourceVATEntries.Next() = 0;
         AggregatedVATEntries.Reset();
-        SourceVATEntries.Reset();
     end;
 
     local procedure CollectVATPostingSetup(var TempVATPostingSetup: Record "VAT Posting Setup" temporary; VATEntry: Record "VAT Entry")
