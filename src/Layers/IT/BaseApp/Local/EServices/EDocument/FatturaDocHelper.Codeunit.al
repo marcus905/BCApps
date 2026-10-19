@@ -727,6 +727,30 @@ codeunit 12184 "Fattura Doc. Helper"
         end;
     end;
 
+    /// <summary>
+    /// Calculates the gross total of an unposted sales invoice or credit memo
+    /// using the same source-line calculation as standard posted FatturaPA export.
+    /// This excludes synthetic split-payment lines, which reduce the receivable
+    /// but must not reduce ImportoTotaleDocumento.
+    /// </summary>
+    procedure GetPreviewSalesDocumentTotal(
+        SalesHeader: Record "Sales Header";
+        TempFatturaHeader: Record "Fattura Header" temporary): Decimal
+    var
+        SalesLine: Record "Sales Line";
+        LineRecRef: RecordRef;
+    begin
+        Initialize();
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        if not SalesLine.FindSet() then
+            exit(0);
+
+        LineRecRef.GetTable(SalesLine);
+        LineRecRef.FindFirst();
+        exit(ExchangeToLCYAmount(TempFatturaHeader, GetTotalDocAmount(LineRecRef)));
+    end;
+
     local procedure GetTotalDocAmount(var LineRecRef: RecordRef) TotalAmount: Decimal
     var
         AmountInclVAT: Decimal;
