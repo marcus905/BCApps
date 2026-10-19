@@ -654,6 +654,22 @@ codeunit 12184 "Fattura Doc. Helper"
         exit(NonPublicCompanyLbl);
     end;
 
+    /// <summary>
+    /// Applies the standard transmission and document-type rules to a preview
+    /// header without assigning a real FatturaPA progressive number.
+    /// </summary>
+    procedure PopulatePreviewHeaderFiscalIdentity(
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        Customer: Record Customer;
+        FatturaDocType: Variant)
+    begin
+        CompanyInformation.Get();
+        TempFatturaHeader."Transmission Type" := GetTransmissionType(Customer);
+        TempFatturaHeader."Fattura Document Type" :=
+            CopyStr(GetTipoDocumento(TempFatturaHeader, Customer, FatturaDocType),
+                1, MaxStrLen(TempFatturaHeader."Fattura Document Type"));
+    end;
+
     local procedure GetTipoDocumento(TempFatturaHeader: Record "Fattura Header" temporary; Customer: Record Customer; FatturaDocType: Variant): Text
     begin
         if Format(FatturaDocType) <> '' then
