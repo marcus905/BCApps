@@ -115,12 +115,18 @@ codeunit 144200 "FatturaPA Test"
         Customer.Get(SalesHeader."Bill-to Customer No.");
         Customer.Validate("PA Code", '123456');
         Customer.Modify(true);
+        Customer.Get(Customer."No.");
+        Customer.TestField("PA Code");
+        if SalesHeader."Sell-to Customer No." <> SalesHeader."Bill-to Customer No." then begin
+            Customer.Get(SalesHeader."Sell-to Customer No.");
+            Customer.Validate("PA Code", '123456');
+            Customer.Modify(true);
+        end;
         Commit(); // Posting preview runs in a separate transaction.
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
 
     [Test]
-    [HandlerFunctions('CapturePostedFatturaPAErrors')]
     procedure PreviewMatchesPostedCreditMemoFatturaPAValues()
     var
         SalesHeader: Record "Sales Header";
