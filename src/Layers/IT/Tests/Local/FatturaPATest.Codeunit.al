@@ -239,6 +239,95 @@ codeunit 144200 "FatturaPA Test"
         Assert.IsTrue(FatturaDocumentType.IsEmpty(), 'Self-billing preview initialized setup.');
     end;
 
+    [Test]
+    procedure PreviewMatchesPostedInvoiceWithMultipleVATRates()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        OriginalVATPostingSetup: Record "VAT Posting Setup";
+        AdditionalVATPostingSetup: Record "VAT Posting Setup";
+        VATProductPostingGroup: Record "VAT Product Posting Group";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        OriginalVATPostingSetup.Get(SalesLine."VAT Bus. Posting Group", SalesLine."VAT Prod. Posting Group");
+
+        LibraryERM.CreateVATProductPostingGroup(VATProductPostingGroup);
+        LibraryERM.CreateVATPostingSetup(
+            AdditionalVATPostingSetup, OriginalVATPostingSetup."VAT Bus. Posting Group",
+            VATProductPostingGroup.Code);
+        AdditionalVATPostingSetup.Validate(
+            "VAT Calculation Type", AdditionalVATPostingSetup."VAT Calculation Type"::"Normal VAT");
+        if OriginalVATPostingSetup."VAT %" = 7 then
+            AdditionalVATPostingSetup.Validate("VAT %", 11)
+        else
+            AdditionalVATPostingSetup.Validate("VAT %", 7);
+        AdditionalVATPostingSetup.Validate("Sales VAT Account", OriginalVATPostingSetup."Sales VAT Account");
+        AdditionalVATPostingSetup.Validate("Purchase VAT Account", OriginalVATPostingSetup."Purchase VAT Account");
+        AdditionalVATPostingSetup.Modify(true);
+        CreateSalesLineWithVATPostingGroup(
+            SalesLine, SalesHeader, SalesLine.Type::Item, VATProductPostingGroup.Code);
+
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewMatchesPostedInvoiceWithSplitPayment()
+    var
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+        CreateInvoiceWithSplitPayment(SalesHeader);
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewMatchesPostedInvoiceWithUnrealizedVAT()
+    var
+        SalesHeader: Record "Sales Header";
+        VATPostingSetup: Record "VAT Posting Setup";
+    begin
+        Initialize();
+        CreateUnrealizedVATPostingSetup(VATPostingSetup);
+        CreateInvoiceWithVATPostingSetup(SalesHeader, VATPostingSetup);
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewMatchesPostedPartiallyInvoicedSalesOrder()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        SalesLine.TestField(Quantity, 5);
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 2);
+        SalesLine.Modify(true);
+        SalesHeader.Validate(Ship, true);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
     local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
     var
         SalesInvoiceHeader: Record "Sales Invoice Header";
