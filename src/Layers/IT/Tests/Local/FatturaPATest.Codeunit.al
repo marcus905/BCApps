@@ -172,11 +172,12 @@ codeunit 144200 "FatturaPA Test"
         DocumentNo := LibrarySales.PostSalesDocument(SalesHeader, true, true);
         if SalesHeader."Document Type" = SalesHeader."Document Type"::Invoice then begin
             SalesInvoiceHeader.Get(DocumentNo);
+            SalesInvoiceHeader.SetRange("No.", DocumentNo);
             // The standard helper resolves customer number from field 4 of
             // the posted header. Check the exact persisted record immediately
             // before export rather than relying on the source document.
-            Assert.IsTrue(RecipientCustomer.Get(SalesInvoiceHeader."Sell-to Customer No."),
-                'Posted invoice sell-to customer is missing.');
+            Assert.IsTrue(RecipientCustomer.Get(SalesInvoiceHeader."Bill-to Customer No."),
+                'Posted invoice bill-to customer is missing.');
             Assert.IsTrue(RecipientCustomer."PA Code" <> '',
                 StrSubstNo('Posted invoice %1 references customer %2 with blank PA Code (source sell-to %3, bill-to %4).',
                     DocumentNo, RecipientCustomer."No.", SalesHeader."Sell-to Customer No.", SalesHeader."Bill-to Customer No."));
@@ -185,6 +186,7 @@ codeunit 144200 "FatturaPA Test"
                 CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
         end else begin
             SalesCrMemoHeader.Get(DocumentNo);
+            SalesCrMemoHeader.SetRange("No.", DocumentNo);
             ElectronicDocumentFormat.SendElectronically(
                 PostedBlob, ClientFileName, SalesCrMemoHeader,
                 CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
