@@ -351,7 +351,7 @@ codeunit 144200 "FatturaPA Test"
             PreviewBlob, TempFatturaLine, TempFatturaHeader, ClientFileName);
 
         DocumentNo := LibrarySales.PostSalesDocument(SalesHeader, true, true);
-        if SalesHeader."Document Type" = SalesHeader."Document Type"::Invoice then begin
+        if SalesHeader."Document Type" in [SalesHeader."Document Type"::Invoice, SalesHeader."Document Type"::Order] then begin
             SalesInvoiceHeader.Get(DocumentNo);
             SalesInvoiceHeader.SetRange("No.", DocumentNo);
             // The standard helper resolves customer number from field 4 of
