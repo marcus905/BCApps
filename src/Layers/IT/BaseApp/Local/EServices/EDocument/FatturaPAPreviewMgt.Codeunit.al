@@ -57,9 +57,10 @@ codeunit 12285 "FatturaPA Preview Mgt."
                 TempCustLedgEntry,
                 TempDtldCustLedgEntry);
 
-        SetPreviewDocumentTotal(
-            TempFatturaHeader,
-            TempDtldCustLedgEntry);
+        if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then
+            SetPreviewDocumentTotal(TempFatturaHeader, TempDtldCustLedgEntry)
+        else
+            SetPreviewDocumentTotalFromSource(SalesHeader, TempFatturaHeader);
     end;
 
     local procedure BuildHeader(
@@ -196,6 +197,20 @@ codeunit 12285 "FatturaPA Preview Mgt."
             Round(
                 SalesLine.Amount * EffectiveQty / SalesLine.Quantity,
                 Precision));
+    end;
+
+    local procedure SetPreviewDocumentTotalFromSource(
+        SalesHeader: Record "Sales Header";
+        var TempFatturaHeader: Record "Fattura Header" temporary)
+    var
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        TempFatturaHeader.Reset();
+        if TempFatturaHeader.FindFirst() then begin
+            TempFatturaHeader."Total Amount" :=
+                FatturaDocHelper.GetPreviewSalesDocumentTotal(SalesHeader, TempFatturaHeader);
+            TempFatturaHeader.Modify();
+        end;
     end;
 
     local procedure SetPreviewDocumentTotal(
