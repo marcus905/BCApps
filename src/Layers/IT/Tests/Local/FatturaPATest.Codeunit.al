@@ -164,6 +164,81 @@ codeunit 144200 "FatturaPA Test"
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
 
+    [Test]
+    procedure PreviewDocumentTypeEmptyCatalogDoesNotInitializeSetup()
+    var
+        Customer: Record Customer;
+        FatturaDocumentType: Record "Fattura Document Type";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        Initialize();
+        Customer.Get(CreateCustomer());
+        FatturaDocumentType.DeleteAll(false);
+        Assert.IsTrue(FatturaDocumentType.IsEmpty(), 'Document type catalog must start empty.');
+
+        TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::Invoice;
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(TempFatturaHeader, Customer, '');
+        Assert.AreEqual('TD01', TempFatturaHeader."Fattura Document Type", 'Empty-catalog invoice default differs.');
+        Assert.IsTrue(FatturaDocumentType.IsEmpty(), 'Preview initialized document type setup.');
+
+        TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::"Credit Memo";
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(TempFatturaHeader, Customer, '');
+        Assert.AreEqual('TD04', TempFatturaHeader."Fattura Document Type", 'Empty-catalog credit memo default differs.');
+        Assert.IsTrue(FatturaDocumentType.IsEmpty(), 'Credit memo preview initialized document type setup.');
+    end;
+
+    [Test]
+    procedure PreviewDocumentTypeReadsConfiguredDefaultWithoutWrites()
+    var
+        Customer: Record Customer;
+        FatturaDocumentType: Record "Fattura Document Type";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        Initialize();
+        Customer.Get(CreateCustomer());
+        FatturaDocumentType.DeleteAll(false);
+        FatturaDocumentType.Init();
+        FatturaDocumentType."No." := 'TD24';
+        FatturaDocumentType.Invoice := true;
+        FatturaDocumentType.Insert(false);
+
+        TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::Invoice;
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(TempFatturaHeader, Customer, '');
+        Assert.AreEqual('TD24', TempFatturaHeader."Fattura Document Type", 'Configured invoice default was ignored.');
+        Assert.AreEqual(1, FatturaDocumentType.Count(), 'Preview modified the configured catalog.');
+
+        TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::"Credit Memo";
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(TempFatturaHeader, Customer, '');
+        Assert.AreEqual('', TempFatturaHeader."Fattura Document Type", 'Incomplete catalog must not be defaulted.');
+        Assert.AreEqual(1, FatturaDocumentType.Count(), 'Preview populated incomplete catalog.');
+    end;
+
+    [Test]
+    procedure PreviewDocumentTypeHonorsExplicitCodeAndSelfBilling()
+    var
+        CompanyInformation: Record "Company Information";
+        Customer: Record Customer;
+        FatturaDocumentType: Record "Fattura Document Type";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        Initialize();
+        Customer.Get(CreateCustomer());
+        CompanyInformation.Get();
+        FatturaDocumentType.DeleteAll(false);
+
+        TempFatturaHeader."Document Type" := TempFatturaHeader."Document Type"::Invoice;
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(TempFatturaHeader, Customer, 'TD24');
+        Assert.AreEqual('TD24', TempFatturaHeader."Fattura Document Type", 'Explicit type should be preserved.');
+
+        Customer."VAT Registration No." := CompanyInformation."VAT Registration No.";
+        FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(TempFatturaHeader, Customer, '');
+        Assert.AreEqual('TD20', TempFatturaHeader."Fattura Document Type", 'Empty-catalog self-billing default differs.');
+        Assert.IsTrue(FatturaDocumentType.IsEmpty(), 'Self-billing preview initialized setup.');
+    end;
+
     local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
     var
         SalesInvoiceHeader: Record "Sales Invoice Header";
