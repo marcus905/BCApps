@@ -59,7 +59,7 @@ codeunit 12281 "FatturaPA Preview Accounting"
                     TempDtldCustLedgEntry);
 
                 FatturaDocHelper.InsertPreviewPaymentFatturaLine(
-                    TempFatturaLine, TempCustLedgEntry."Due Date", Abs(Amount));
+                    TempFatturaLine, TempCustLedgEntry."Due Date", Amount);
             until TempCustLedgEntry.Next() = 0;
     end;
 
