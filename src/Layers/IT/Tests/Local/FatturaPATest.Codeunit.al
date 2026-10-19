@@ -105,11 +105,16 @@ codeunit 144200 "FatturaPA Test"
     procedure PreviewMatchesPostedInvoiceFatturaPAValues()
     var
         SalesHeader: Record "Sales Header";
+        Customer: Record Customer;
     begin
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
             CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        // Posted FatturaPA export requires the recipient identifier.
+        Customer.Get(SalesHeader."Bill-to Customer No.");
+        Customer.Validate("PA Code", '123456');
+        Customer.Modify(true);
         Commit(); // Posting preview runs in a separate transaction.
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
