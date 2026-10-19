@@ -1243,6 +1243,10 @@ codeunit 12184 "Fattura Doc. Helper"
             exit;
 
         LineRecRef.GetTable(SalesLine);
+        // Standard posted export omits the synthetic Full-VAT split-payment line.
+        if IsSplitPaymentLine(LineRecRef) then
+            exit;
+
         if SalesLine.Quantity <> 0 then
             InvDiscAmountByQty := SalesLine."Inv. Discount Amount" / SalesLine.Quantity;
 
