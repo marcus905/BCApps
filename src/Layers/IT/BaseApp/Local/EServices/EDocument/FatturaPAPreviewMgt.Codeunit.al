@@ -39,6 +39,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
 
         BuildHeader(SalesHeader, PreviewProgressiveNo, TempFatturaHeader);
         BuildDocumentLines(SalesHeader, TempFatturaLine);
+        BuildSourceReferences(SalesHeader, TempFatturaHeader, TempFatturaLine);
 
         // Use the real posting engine for accounting output.
         PreviewCollector.Collect(
@@ -127,6 +128,61 @@ codeunit 12285 "FatturaPA Preview Mgt."
                 PaymentTerms."Fattura Payment Terms Code";
 
         TempFatturaHeader.Insert();
+    end;
+
+    local procedure BuildSourceReferences(
+        SalesHeader: Record "Sales Header";
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        var TempFatturaLine: Record "Fattura Line" temporary)
+    var
+        SalesLine: Record "Sales Line";
+        SalesShipmentLine: Record "Sales Shipment Line";
+        SalesShipmentHeader: Record "Sales Shipment Header";
+        TempShipmentBuffer: Record "Fattura Line" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+        ShipmentLineNo: Integer;
+        HasShipmentReference: Boolean;
+    begin
+        TempFatturaHeader.Reset();
+        if not TempFatturaHeader.FindFirst() then
+            exit;
+
+        if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then begin
+            SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+            SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+            if SalesShipmentLine.FindSet() then
+                repeat
+                    if SalesShipmentHeader.Get(SalesShipmentLine."Document No.") then begin
+                        ShipmentLineNo += 1;
+                        FatturaDocHelper.InsertShipmentBuffer(
+                            TempShipmentBuffer, Format(SalesLine.Type::Item), ShipmentLineNo,
+                            SalesShipmentLine."Document No.", SalesShipmentLine."Shipment Date",
+                            SalesShipmentHeader."Fattura Project Code",
+                            SalesShipmentHeader."Fattura Tender Code",
+                            SalesShipmentHeader."Customer Purchase Order No.", false);
+                        HasShipmentReference := true;
+                    end;
+                until SalesShipmentLine.Next() = 0;
+        end;
+
+        // A customer order reference is known before posting, even if no DDT
+        // exists. Construct only the order metadata; never invent a shipment.
+        if (SalesHeader."Customer Purchase Order No." <> '') and not HasShipmentReference then begin
+            TempFatturaLine.Reset();
+            TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Order);
+            TempFatturaLine.Init();
+            TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Order;
+            TempFatturaLine."Line No." := 1;
+            TempFatturaLine."Document No." := SalesHeader."No.";
+            TempFatturaLine."Customer Purchase Order No." := SalesHeader."Customer Purchase Order No.";
+            TempFatturaLine."Fattura Project Code" := SalesHeader."Fattura Project Code";
+            TempFatturaLine."Fattura Tender Code" := SalesHeader."Fattura Tender Code";
+            TempFatturaLine.Insert();
+            TempFatturaLine.Reset();
+        end else
+            if HasShipmentReference then
+                FatturaDocHelper.BuildPreviewOrderShipmentBuffers(
+                    TempFatturaLine, TempShipmentBuffer, TempFatturaHeader);
     end;
 
     local procedure BuildDocumentLines(
