@@ -74,6 +74,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
         Customer.Get(SalesHeader."Bill-to Customer No.");
+        SalesHeader.CalcFields("Invoice Discount Amount");
 
         TempFatturaHeader.Init();
         TempFatturaHeader."Customer No" := Customer."No.";
