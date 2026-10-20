@@ -165,9 +165,12 @@ codeunit 12285 "FatturaPA Preview Mgt."
                 until SalesShipmentLine.Next() = 0;
         end;
 
-        // A customer order reference is known before posting, even if no DDT
-        // exists. Construct only the order metadata; never invent a shipment.
-        if (SalesHeader."Customer Purchase Order No." <> '') and not HasShipmentReference then begin
+        // Standard export derives order metadata from shipment information.
+        // A direct invoice with only a customer PO does not generate an Order row.
+        // For sales orders, prepare known order metadata without inventing a DDT.
+        if (SalesHeader."Document Type" = SalesHeader."Document Type"::Order) and
+           (SalesHeader."Customer Purchase Order No." <> '') and not HasShipmentReference
+        then begin
             TempFatturaLine.Reset();
             TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Order);
             TempFatturaLine.Init();
