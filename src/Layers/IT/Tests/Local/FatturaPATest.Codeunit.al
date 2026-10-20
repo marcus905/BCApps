@@ -417,6 +417,64 @@ codeunit 144200 "FatturaPA Test"
             'Preview did not use the VAT-entry tax representative number.');
     end;
 
+    [Test]
+    procedure PreviewMatchesPostedInvoiceCustomerOrderReferences()
+    var
+        SalesHeader: Record "Sales Header";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        SalesHeader.Validate("Customer Purchase Order No.", 'PO-PARITY-TEST');
+        SalesHeader.Modify(true);
+
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewMatchesPostedOrderWithExistingShipmentReferences()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        SalesShipmentLine: Record "Sales Shipment Line";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesHeader.Validate("Customer Purchase Order No.", 'PO-SHPT-PARITY');
+        SalesHeader.Modify(true);
+
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Fixture did not post a shipment.');
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 0);
+        SalesLine.Validate("Qty. to Invoice", 2);
+        SalesLine.Modify(true);
+        SalesHeader.Validate(Ship, false);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+
+        Commit();
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
     local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
     var
         SalesInvoiceHeader: Record "Sales Invoice Header";
@@ -480,6 +538,23 @@ codeunit 144200 "FatturaPA Test"
         AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta');
         CompareAdditionalPreviewAndPostedFields(PreviewXML, PostedXML);
+        CompareOrderAndShipmentMetadata(PreviewXML, PostedXML);
+    end;
+
+    local procedure CompareOrderAndShipmentMetadata(
+        var PreviewXML: Record "XML Buffer" temporary;
+        var PostedXML: Record "XML Buffer" temporary)
+    var
+        GeneralDataPath: Text;
+    begin
+        GeneralDataPath := '/p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali';
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/IdDocumento');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCUP');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCIG');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/RiferimentoNumeroLinea');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/NumeroDDT');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/DataDDT');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/RiferimentoNumeroLinea');
     end;
 
     local procedure CompareAdditionalPreviewAndPostedFields(
