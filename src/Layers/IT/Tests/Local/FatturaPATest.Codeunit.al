@@ -360,6 +360,7 @@ codeunit 144200 "FatturaPA Test"
     [Test]
     procedure PreviewIncludesKnownCustomerOrderMetadata()
     var
+        FatturaProjectInfo: Record "Fattura Project Info";
         SalesHeader: Record "Sales Header";
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
@@ -369,6 +370,15 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
             CreateCustomer(), SalesHeader."Document Type"::Order);
+        FatturaProjectInfo.Init();
+        FatturaProjectInfo.Code := 'CUP-TEST';
+        FatturaProjectInfo.Type := FatturaProjectInfo.Type::Project;
+        FatturaProjectInfo.Insert();
+        FatturaProjectInfo.Init();
+        FatturaProjectInfo.Code := 'CIG-TEST';
+        FatturaProjectInfo.Type := FatturaProjectInfo.Type::Tender;
+        FatturaProjectInfo.Insert();
+
         SalesHeader.Validate("Customer Purchase Order No.", 'CUSTOMER-PO-TEST');
         SalesHeader.Validate("Fattura Project Code", 'CUP-TEST');
         SalesHeader.Validate("Fattura Tender Code", 'CIG-TEST');
