@@ -538,12 +538,17 @@ codeunit 144200 "FatturaPA Test"
         AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta');
         CompareAdditionalPreviewAndPostedFields(PreviewXML, PostedXML);
-        CompareOrderAndShipmentMetadata(PreviewXML, PostedXML);
+        // A shipment created by this posting run has no DDT number at preview time.
+        // Compare DDTs only when no new shipment is being posted.
+        CompareOrderAndShipmentMetadata(
+            PreviewXML, PostedXML,
+            (SalesHeader."Document Type" <> SalesHeader."Document Type"::Order) or not SalesHeader.Ship);
     end;
 
     local procedure CompareOrderAndShipmentMetadata(
         var PreviewXML: Record "XML Buffer" temporary;
-        var PostedXML: Record "XML Buffer" temporary)
+        var PostedXML: Record "XML Buffer" temporary;
+        CompareShipmentData: Boolean)
     var
         GeneralDataPath: Text;
     begin
@@ -552,6 +557,8 @@ codeunit 144200 "FatturaPA Test"
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCUP');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCIG');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/RiferimentoNumeroLinea');
+        if not CompareShipmentData then
+            exit;
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/NumeroDDT');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/DataDDT');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/RiferimentoNumeroLinea');
