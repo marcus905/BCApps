@@ -8,6 +8,7 @@ using Microsoft.Foundation.PaymentTerms;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.Receivables;
+using Microsoft.Sales.History;
 using Microsoft.Finance.ReceivablesPayables;
 
 codeunit 12285 "FatturaPA Preview Mgt."
@@ -46,6 +47,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
             TempCustLedgEntry,
             TempDtldCustLedgEntry);
 
+        PopulateTaxRepresentative(TempFatturaHeader, TempVATEntry);
+
         PreviewAccounting.AddVATRows(
             TempFatturaLine,
             TempVATEntry,
@@ -61,6 +64,19 @@ codeunit 12285 "FatturaPA Preview Mgt."
             SetPreviewDocumentTotal(TempFatturaHeader, TempDtldCustLedgEntry)
         else
             SetPreviewDocumentTotalFromSource(SalesHeader, TempFatturaHeader);
+    end;
+
+    local procedure PopulateTaxRepresentative(
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        var TempVATEntry: Record "VAT Entry" temporary)
+    var
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        TempFatturaHeader.Reset();
+        if TempFatturaHeader.FindFirst() then begin
+            FatturaDocHelper.PopulatePreviewTaxRepresentative(TempFatturaHeader, TempVATEntry);
+            TempFatturaHeader.Modify();
+        end;
     end;
 
     local procedure BuildHeader(
