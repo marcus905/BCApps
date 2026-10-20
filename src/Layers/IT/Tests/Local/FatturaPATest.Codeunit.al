@@ -329,6 +329,84 @@ codeunit 144200 "FatturaPA Test"
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
 
+    [Test]
+    procedure PreviewIncludesCalculatedInvoiceDiscount()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Invoice);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        SalesLine.Validate("Inv. Discount Amount", 1);
+        SalesLine.Modify(true);
+        SalesHeader.CalcFields("Invoice Discount Amount");
+        Assert.AreEqual(1, SalesHeader."Invoice Discount Amount", 'Discount test fixture did not populate source FlowField.');
+
+        Commit();
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaHeader.FindFirst();
+        Assert.AreEqual(1, TempFatturaHeader."Total Inv. Discount", 'Preview invoice discount does not match calculated source.');
+    end;
+
+    [Test]
+    procedure PreviewIncludesKnownCustomerOrderMetadata()
+    var
+        SalesHeader: Record "Sales Header";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesHeader.Validate("Customer Purchase Order No.", 'CUSTOMER-PO-TEST');
+        SalesHeader.Validate("Fattura Project Code", 'CUP-TEST');
+        SalesHeader.Validate("Fattura Tender Code", 'CIG-TEST');
+        SalesHeader.Modify(true);
+
+        Commit();
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Order);
+        Assert.IsTrue(TempFatturaLine.FindFirst(), 'Preview is missing source purchase-order metadata.');
+        Assert.AreEqual('CUSTOMER-PO-TEST', TempFatturaLine."Customer Purchase Order No.", 'Customer PO differs.');
+        Assert.AreEqual('CUP-TEST', TempFatturaLine."Fattura Project Code", 'CUP differs.');
+        Assert.AreEqual('CIG-TEST', TempFatturaLine."Fattura Tender Code", 'CIG differs.');
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Preview invented a shipment before posting.');
+    end;
+
+    [Test]
+    procedure PreviewTaxRepresentativeUsesTemporaryVATEntry()
+    var
+        TempVATEntry: Record "VAT Entry" temporary;
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        Initialize();
+        TempVATEntry.Init();
+        TempVATEntry."Entry No." := 1;
+        TempVATEntry."Tax Representative Type" := TempVATEntry."Tax Representative Type"::Vendor;
+        TempVATEntry."Tax Representative No." := 'TAX-REP-TEST';
+        TempVATEntry.Insert();
+
+        FatturaDocHelper.PopulatePreviewTaxRepresentative(TempFatturaHeader, TempVATEntry);
+        Assert.AreEqual(
+            TempVATEntry."Tax Representative Type", TempFatturaHeader."Tax Representative Type",
+            'Preview did not use the VAT-entry tax representative type.');
+        Assert.AreEqual('TAX-REP-TEST', TempFatturaHeader."Tax Representative No.",
+            'Preview did not use the VAT-entry tax representative number.');
+    end;
+
     local procedure ComparePreviewAndPostedFatturaPA(var SalesHeader: Record "Sales Header")
     var
         SalesInvoiceHeader: Record "Sales Invoice Header";
