@@ -1440,6 +1440,20 @@ codeunit 12184 "Fattura Doc. Helper"
     /// Common eligibility for an unposted sales line to become a fiscal
     /// commercial line. Reused when building DDT line references.
     /// </summary>
+    /// <summary>
+    /// Prorates an existing source invoice discount to the quantity being
+    /// invoiced. Posted documents already contain the invoiced line discount.
+    /// </summary>
+    procedure ProrateFatturaInvoiceDiscount(
+        SourceInvoiceDiscount: Decimal;
+        SourceQuantity: Decimal;
+        InvoicedQuantity: Decimal): Decimal
+    begin
+        if SourceQuantity = 0 then
+            exit(0);
+        exit(SourceInvoiceDiscount * InvoicedQuantity / SourceQuantity);
+    end;
+
     procedure ShouldIncludePreviewSalesLine(
         SalesHeader: Record "Sales Header";
         SalesLine: Record "Sales Line";
