@@ -216,14 +216,10 @@ codeunit 12184 "Fattura Doc. Helper"
             exit;
 
         FindCustLedgEntry(CustLedgerEntry, TempFatturaHeader);
-        Clear(TempFatturaLine);
-        TempFatturaLine."Line Type" := TempFatturaLine."Line Type"::Payment;
         repeat
-            TempFatturaLine."Line No." += 1;
-            TempFatturaLine."Due Date" := CustLedgerEntry."Due Date";
             CustLedgerEntry.CalcFields("Amount (LCY)");
-            TempFatturaLine.Amount := CustLedgerEntry."Amount (LCY)";
-            TempFatturaLine.Insert();
+            InsertPaymentFatturaLine(
+                TempFatturaLine, CustLedgerEntry."Due Date", CustLedgerEntry."Amount (LCY)");
         until CustLedgerEntry.Next() = 0;
     end;
 
@@ -357,9 +353,27 @@ codeunit 12184 "Fattura Doc. Helper"
         exit(ErrorMessage.HasErrors(false));
     end;
 
-    local procedure InitFatturaHeaderWithCheck(var TempFatturaHeader: Record "Fattura Header" temporary; var LineRecRef: RecordRef; HeaderRecRef: RecordRef): Boolean
+    /// <summary>
+    /// Maps FatturaPA payment method and terms in both posted export and preview.
+    /// Keep the posted rule: the fiscal codes are set only if both setup
+    /// records exist. Return PaymentMethod for posted-header validation.
+    /// </summary>
+    procedure PopulateFatturaPaymentCodes(
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        var PaymentMethod: Record "Payment Method")
     var
         PaymentTerms: Record "Payment Terms";
+    begin
+        if PaymentMethod.Get(TempFatturaHeader."Payment Method Code") and
+           PaymentTerms.Get(TempFatturaHeader."Payment Terms Code")
+        then begin
+            TempFatturaHeader."Fattura PA Payment Method" := PaymentMethod."Fattura PA Payment Method";
+            TempFatturaHeader."Fattura Payment Terms Code" := PaymentTerms."Fattura Payment Terms Code";
+        end;
+    end;
+
+    local procedure InitFatturaHeaderWithCheck(var TempFatturaHeader: Record "Fattura Header" temporary; var LineRecRef: RecordRef; HeaderRecRef: RecordRef): Boolean
+    var
         PaymentMethod: Record "Payment Method";
         SalesInvoiceHeader: Record "Sales Invoice Header";
         SalesCrMemoHeader: Record "Sales Cr.Memo Header";
@@ -367,12 +381,7 @@ codeunit 12184 "Fattura Doc. Helper"
         FieldRef: FieldRef;
     begin
         CheckMandatoryFields(HeaderRecRef, ErrorMessage);
-        if PaymentMethod.Get(TempFatturaHeader."Payment Method Code") and
-           PaymentTerms.Get(TempFatturaHeader."Payment Terms Code")
-        then begin
-            TempFatturaHeader."Fattura PA Payment Method" := PaymentMethod."Fattura PA Payment Method";
-            TempFatturaHeader."Fattura Payment Terms Code" := PaymentTerms."Fattura Payment Terms Code";
-        end;
+        PopulateFatturaPaymentCodes(TempFatturaHeader, PaymentMethod);
         case HeaderRecRef.Number of
             DATABASE::"Sales Invoice Header":
                 begin
@@ -1544,7 +1553,7 @@ codeunit 12184 "Fattura Doc. Helper"
         TempFatturaLine.Reset();
     end;
 
-    procedure InsertPreviewPaymentFatturaLine(
+    procedure InsertPaymentFatturaLine(
         var TempFatturaLine: Record "Fattura Line" temporary;
         DueDate: Date;
         Amount: Decimal)
@@ -1637,13 +1646,9 @@ codeunit 12184 "Fattura Doc. Helper"
     local procedure IsSplitPaymentLine(LineRecRef: RecordRef): Boolean
     var
         VATPostingSetup: Record "VAT Posting Setup";
-        ReversedVATPostingSetup: Record "VAT Posting Setup";
     begin
         if GetVATPostingSetup(VATPostingSetup, LineRecRef) then
-            exit((VATPostingSetup."VAT Calculation Type" = VATPostingSetup."VAT Calculation Type"::"Full VAT") and
-              ReversedVATPostingSetup.Get(
-                VATPostingSetup."Reversed VAT Bus. Post. Group",
-                VATPostingSetup."Reversed VAT Prod. Post. Group"));
+            exit(IsSplitVATSetup(VATPostingSetup));
         exit(false);
     end;
 
@@ -1656,7 +1661,7 @@ codeunit 12184 "Fattura Doc. Helper"
         exit(false);
     end;
 
-    local procedure IsSplitVATSetup(VATPostingSetup: Record "VAT Posting Setup"): Boolean
+    procedure IsSplitVATSetup(VATPostingSetup: Record "VAT Posting Setup"): Boolean
     var
         ReversedVATPostingSetup: Record "VAT Posting Setup";
     begin
