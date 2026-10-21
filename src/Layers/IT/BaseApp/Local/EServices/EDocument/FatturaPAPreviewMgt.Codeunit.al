@@ -222,36 +222,14 @@ codeunit 12285 "FatturaPA Preview Mgt."
         FatturaLineNo: Integer;
         var HasShipmentReference: Boolean)
     var
-        SalesShipmentLine: Record "Sales Shipment Line";
-        SalesShipmentHeader: Record "Sales Shipment Header";
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
-        QuantityToMatch: Decimal;
-        UninvoicedShipmentQty: Decimal;
     begin
-        // Only shipment quantities belonging to this line's pending invoice may
-        // contribute DDT/order references. Already invoiced shipments are excluded.
-        QuantityToMatch := Abs(SalesLine."Qty. to Invoice");
-        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
-        SalesShipmentLine.SetRange("Order Line No.", SalesLine."Line No.");
-        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
-        if SalesShipmentLine.FindSet() then
-            repeat
-                UninvoicedShipmentQty := Abs(SalesShipmentLine.Quantity) - Abs(SalesShipmentLine."Quantity Invoiced");
-                if (QuantityToMatch > 0) and (UninvoicedShipmentQty > 0) then
-                    if SalesShipmentHeader.Get(SalesShipmentLine."Document No.") then begin
-                        FatturaDocHelper.InsertShipmentBuffer(
-                            TempShipmentBuffer, Format(SalesLine.Type::Item), FatturaLineNo,
-                            SalesShipmentLine."Document No.", SalesShipmentHeader."Shipment Date",
-                            SalesShipmentHeader."Fattura Project Code",
-                            SalesShipmentHeader."Fattura Tender Code",
-                            SalesShipmentHeader."Customer Purchase Order No.", false);
-                        HasShipmentReference := true;
-                        if QuantityToMatch <= UninvoicedShipmentQty then
-                            QuantityToMatch := 0
-                        else
-                            QuantityToMatch -= UninvoicedShipmentQty;
-                    end;
-            until (SalesShipmentLine.Next() = 0) or (QuantityToMatch <= 0);
+        // Before posting the order line holds the cumulative quantity already invoiced.
+        // The shared helper reconstructs the same shipment allocation for posted output.
+        FatturaDocHelper.CollectOrderShipmentReferences(
+            TempShipmentBuffer, SalesHeader."No.", SalesLine."Line No.", FatturaLineNo,
+            Abs(SalesLine."Qty. to Invoice"), Abs(SalesLine."Quantity Invoiced"),
+            HasShipmentReference);
     end;
 
     local procedure BuildDocumentLines(
