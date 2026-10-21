@@ -1009,19 +1009,17 @@ codeunit 12184 "Fattura Doc. Helper"
                             case TempFatturaHeader."Entry Type" of
                                 TempFatturaHeader."Entry Type"::Sales:
                                     begin
-                                        SalesShipmentHeader.Get(ShptNo);
-                                        ShipmentDate := SalesShipmentHeader."Shipment Date";
-                                        FatturaProjectCode := SalesShipmentHeader."Fattura Project Code";
-                                        FatturaTenderCode := SalesShipmentHeader."Fattura Tender Code";
-                                        CustomerPurchOrderNo := SalesShipmentHeader."Customer Purchase Order No.";
+                                        InsertSalesShipmentReference(
+                                            TempShptFatturaLine, ShptNo, i, IsSplitPaymentLine(LineRecRef));
                                     end;
                                 else
                                     OnCollectShipmentInfo(
                                         TempFatturaHeader, ShptNo, ShipmentDate, FatturaProjectCode, FatturaTenderCode, CustomerPurchOrderNo);
                             end;
-                            InsertShipmentBuffer(
-                                TempShptFatturaLine, Type, i, ShptNo, ShipmentDate, FatturaProjectCode, FatturaTenderCode,
-                                CustomerPurchOrderNo, IsSplitPaymentLine(LineRecRef));
+                            if TempFatturaHeader."Entry Type" <> TempFatturaHeader."Entry Type"::Sales then
+                                InsertShipmentBuffer(
+                                    TempShptFatturaLine, Type, i, ShptNo, ShipmentDate, FatturaProjectCode, FatturaTenderCode,
+                                    CustomerPurchOrderNo, IsSplitPaymentLine(LineRecRef));
                         end;
                 end;
                 if Type = GetOptionCaptionValue(SalesLine.Type::"G/L Account".AsInteger()) then
@@ -1093,6 +1091,30 @@ codeunit 12184 "Fattura Doc. Helper"
     /// shipment ordering and quantity allocation for preview and posted export.
     /// The callers provide quantities before/current posting respectively.
     /// </summary>
+    /// <summary>
+    /// Adds an existing sales shipment reference using its authoritative header
+    /// metadata. Used by both posted export and unposted invoice preview.
+    /// </summary>
+    procedure InsertSalesShipmentReference(
+        var TempShptFatturaLine: Record "Fattura Line" temporary;
+        ShipmentNo: Code[20];
+        FatturaLineNo: Integer;
+        SplitLine: Boolean): Boolean
+    var
+        SalesShipmentHeader: Record "Sales Shipment Header";
+        SalesLine: Record "Sales Line";
+    begin
+        if (ShipmentNo = '') or not SalesShipmentHeader.Get(ShipmentNo) then
+            exit(false);
+
+        InsertShipmentBuffer(
+            TempShptFatturaLine, GetOptionCaptionValue(SalesLine.Type::Item.AsInteger()),
+            FatturaLineNo, SalesShipmentHeader."No.", SalesShipmentHeader."Shipment Date",
+            SalesShipmentHeader."Fattura Project Code", SalesShipmentHeader."Fattura Tender Code",
+            SalesShipmentHeader."Customer Purchase Order No.", SplitLine);
+        exit(true);
+    end;
+
     procedure CollectOrderShipmentReferences(
         var TempShptFatturaLine: Record "Fattura Line" temporary;
         OrderNo: Code[20];
@@ -1126,11 +1148,8 @@ codeunit 12184 "Fattura Doc. Helper"
                     AvailableQty := ShippedQty - PreviouslyInvoicedQty;
                     PreviouslyInvoicedQty := 0;
                     if (AvailableQty > 0) and SalesShipmentHeader.Get(SalesShipmentLine."Document No.") then begin
-                        InsertShipmentBuffer(
-                            TempShptFatturaLine, GetOptionCaptionValue(SalesLine.Type::Item.AsInteger()),
-                            FatturaLineNo, SalesShipmentHeader."No.", SalesShipmentHeader."Shipment Date",
-                            SalesShipmentHeader."Fattura Project Code", SalesShipmentHeader."Fattura Tender Code",
-                            SalesShipmentHeader."Customer Purchase Order No.", false);
+                        InsertSalesShipmentReference(
+                            TempShptFatturaLine, SalesShipmentHeader."No.", FatturaLineNo, false);
                         HasShipmentReference := true;
                         if QuantityToInvoice <= AvailableQty then
                             QuantityToInvoice := 0
