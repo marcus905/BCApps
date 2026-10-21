@@ -947,6 +947,7 @@ codeunit 12184 "Fattura Doc. Helper"
         CustomerPurchOrderNo: Text[35];
         ShipmentDate: Date;
         PostedLineNo: Integer;
+        DocumentLineNo: Integer;
         i: Integer;
     begin
         if TempFatturaHeader."Document Type" <> TempFatturaHeader."Document Type"::Invoice then
@@ -955,6 +956,10 @@ codeunit 12184 "Fattura Doc. Helper"
         if LineRecRef.FindSet() then
             repeat
                 i += 1;
+                if (Format(LineRecRef.Field(LineTypeFieldNo).Value) <> ' ') and
+                   not IsSplitPaymentLine(LineRecRef)
+                then
+                    DocumentLineNo += 1;
                 FatturaProjectCode := '';
                 FatturaTenderCode := '';
                 CustomerPurchOrderNo := '';
@@ -969,7 +974,7 @@ codeunit 12184 "Fattura Doc. Helper"
                        (TempFatturaHeader."Order No." <> '')
                     then
                         CollectPostedSalesInvoiceShipments(
-                            TempShptFatturaLine, TempFatturaHeader."Document No.", PostedLineNo, i, Type)
+                            TempShptFatturaLine, TempFatturaHeader."Document No.", PostedLineNo, DocumentLineNo, Type)
                     else
                         if ShptNo <> '' then begin
                             case TempFatturaHeader."Entry Type" of
@@ -986,7 +991,7 @@ codeunit 12184 "Fattura Doc. Helper"
                                         TempFatturaHeader, ShptNo, ShipmentDate, FatturaProjectCode, FatturaTenderCode, CustomerPurchOrderNo);
                             end;
                             InsertShipmentBuffer(
-                                TempShptFatturaLine, Type, i, ShptNo, ShipmentDate, FatturaProjectCode, FatturaTenderCode,
+                                TempShptFatturaLine, Type, DocumentLineNo, ShptNo, ShipmentDate, FatturaProjectCode, FatturaTenderCode,
                                 CustomerPurchOrderNo, IsSplitPaymentLine(LineRecRef));
                         end;
                 end;
