@@ -162,6 +162,26 @@ codeunit 12285 "FatturaPA Preview Mgt."
         if not TempFatturaHeader.FindFirst() then
             exit;
 
+        // Direct invoices created with Get Shipment Lines already know their
+        // shipment numbers. Posted export uses the same shipment-header mapper.
+        if SalesHeader."Document Type" = SalesHeader."Document Type"::Invoice then begin
+            SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+            SalesLine.SetRange("Document No.", SalesHeader."No.");
+            if SalesLine.FindSet() then
+                repeat
+                    if SalesLine.Type <> SalesLine.Type::" " then begin
+                        FatturaLineNo += 1;
+                        if (SalesLine.Type = SalesLine.Type::Item) and
+                           (SalesLine."Shipment No." <> '')
+                        then
+                            if FatturaDocHelper.InsertSalesShipmentReference(
+                                TempShipmentBuffer, SalesLine."Shipment No.", FatturaLineNo, false)
+                            then
+                                HasShipmentReference := true;
+                    end;
+                until SalesLine.Next() = 0;
+        end;
+
         if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then begin
             SalesLine.SetRange("Document Type", SalesHeader."Document Type");
             SalesLine.SetRange("Document No.", SalesHeader."No.");
