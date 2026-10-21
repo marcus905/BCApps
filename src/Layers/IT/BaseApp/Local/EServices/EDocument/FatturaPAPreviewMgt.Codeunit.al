@@ -169,7 +169,9 @@ codeunit 12285 "FatturaPA Preview Mgt."
             SalesLine.SetRange("Document No.", SalesHeader."No.");
             if SalesLine.FindSet() then
                 repeat
-                    if SalesLine.Type <> SalesLine.Type::" " then begin
+                    if FatturaDocHelper.ShouldIncludePreviewSalesLine(
+                        SalesHeader, SalesLine, GetEffectiveQtyToInvoice(SalesHeader, SalesLine))
+                    then begin
                         FatturaLineNo += 1;
                         if (SalesLine.Type = SalesLine.Type::Item) and
                            (SalesLine."Shipment No." <> '')
@@ -189,8 +191,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
             // BuildDocumentLines, including non-item lines preceding an item.
             if SalesLine.FindSet() then
                 repeat
-                    if (SalesLine.Type <> SalesLine.Type::" ") and
-                       (GetEffectiveQtyToInvoice(SalesHeader, SalesLine) <> 0)
+                    if FatturaDocHelper.ShouldIncludePreviewSalesLine(
+                        SalesHeader, SalesLine, GetEffectiveQtyToInvoice(SalesHeader, SalesLine))
                     then begin
                         FatturaLineNo += 1;
                         if SalesLine.Type = SalesLine.Type::Item then
@@ -257,11 +259,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
             exit;
 
         repeat
-            if SalesLine.Type <> SalesLine.Type::" " then begin
-                EffectiveQty := GetEffectiveQtyToInvoice(SalesHeader, SalesLine);
-                if (SalesHeader."Document Type" <> SalesHeader."Document Type"::Order) or
-                   (EffectiveQty <> 0)
-                then begin
+            EffectiveQty := GetEffectiveQtyToInvoice(SalesHeader, SalesLine);
+            if FatturaDocHelper.ShouldIncludePreviewSalesLine(SalesHeader, SalesLine, EffectiveQty) then begin
                     TempFatturaHeader."Customer No" := SalesHeader."Bill-to Customer No.";
                     TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
                     TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
@@ -270,7 +269,6 @@ codeunit 12285 "FatturaPA Preview Mgt."
                         TempFatturaLine, DocumentLineNo, TempFatturaHeader, SalesLine,
                         EffectiveQty, GetEffectiveLineAmount(SalesHeader, SalesLine, EffectiveQty),
                         SalesHeader."Prices Including VAT");
-                end;
             end;
         until SalesLine.Next() = 0;
     end;
