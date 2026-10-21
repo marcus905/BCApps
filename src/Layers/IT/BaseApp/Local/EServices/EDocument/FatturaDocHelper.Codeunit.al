@@ -965,11 +965,12 @@ codeunit 12184 "Fattura Doc. Helper"
                     // invoiced by this document. Reading the entire order includes
                     // shipments already invoiced on earlier FatturaPA documents.
                     Evaluate(PostedLineNo, Format(LineRecRef.Field(LineNoFieldNo).Value));
-                    if not ((TempFatturaHeader."Entry Type" = TempFatturaHeader."Entry Type"::Sales) and
-                            (TempFatturaHeader."Order No." <> '') and
-                            CollectPostedSalesInvoiceShipments(
-                                TempShptFatturaLine, TempFatturaHeader."Document No.", PostedLineNo, i, Type))
+                    if (TempFatturaHeader."Entry Type" = TempFatturaHeader."Entry Type"::Sales) and
+                       (TempFatturaHeader."Order No." <> '')
                     then
+                        CollectPostedSalesInvoiceShipments(
+                            TempShptFatturaLine, TempFatturaHeader."Document No.", PostedLineNo, i, Type)
+                    else
                         if ShptNo <> '' then begin
                             case TempFatturaHeader."Entry Type" of
                                 TempFatturaHeader."Entry Type"::Sales:
