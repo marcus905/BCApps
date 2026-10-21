@@ -177,13 +177,18 @@ codeunit 12285 "FatturaPA Preview Mgt."
         if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then begin
             SalesLine.SetRange("Document Type", SalesHeader."Document Type");
             SalesLine.SetRange("Document No.", SalesHeader."No.");
-            SalesLine.SetRange(Type, SalesLine.Type::Item);
-            SalesLine.SetFilter("Qty. to Invoice", '<>0');
+            // Keep DDT line references in the same commercial-line order as
+            // BuildDocumentLines, including non-item lines preceding an item.
             if SalesLine.FindSet() then
                 repeat
-                    FatturaLineNo += 1;
-                    AddPendingShipmentReferences(
-                        SalesHeader, SalesLine, TempShipmentBuffer, FatturaLineNo, HasShipmentReference);
+                    if (SalesLine.Type <> SalesLine.Type::" ") and
+                       (GetEffectiveQtyToInvoice(SalesHeader, SalesLine) <> 0)
+                    then begin
+                        FatturaLineNo += 1;
+                        if SalesLine.Type = SalesLine.Type::Item then
+                            AddPendingShipmentReferences(
+                                SalesHeader, SalesLine, TempShipmentBuffer, FatturaLineNo, HasShipmentReference);
+                    end;
                 until SalesLine.Next() = 0;
         end;
 
