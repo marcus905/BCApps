@@ -87,7 +87,6 @@ codeunit 12285 "FatturaPA Preview Mgt."
     var
         Customer: Record Customer;
         PaymentMethod: Record "Payment Method";
-        PaymentTerms: Record "Payment Terms";
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
         Customer.Get(SalesHeader."Bill-to Customer No.");
@@ -119,13 +118,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         FatturaDocHelper.PopulatePreviewHeaderFiscalIdentity(
             TempFatturaHeader, Customer, SalesHeader."Fattura Document Type");
 
-        if PaymentMethod.Get(SalesHeader."Payment Method Code") then
-            TempFatturaHeader."Fattura PA Payment Method" :=
-                PaymentMethod."Fattura PA Payment Method";
-
-        if PaymentTerms.Get(SalesHeader."Payment Terms Code") then
-            TempFatturaHeader."Fattura Payment Terms Code" :=
-                PaymentTerms."Fattura Payment Terms Code";
+        FatturaDocHelper.PopulateFatturaPaymentCodes(TempFatturaHeader, PaymentMethod);
 
         if (SalesHeader."Document Type" = SalesHeader."Document Type"::"Credit Memo") and
            (SalesHeader."Applies-to Doc. Type" = SalesHeader."Applies-to Doc. Type"::Invoice) and
