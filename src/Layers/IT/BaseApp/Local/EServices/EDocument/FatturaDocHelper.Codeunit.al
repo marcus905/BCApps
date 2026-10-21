@@ -1015,18 +1015,17 @@ codeunit 12184 "Fattura Doc. Helper"
         SalesInvoiceNo: Code[20];
         SalesInvoiceLineNo: Integer;
         FatturaLineNo: Integer;
-        Type: Text[20]): Boolean
+        Type: Text[20])
     var
         SalesInvoiceHeader: Record "Sales Invoice Header";
         SalesInvoiceLine: Record "Sales Invoice Line";
         SalesShipmentHeader: Record "Sales Shipment Header";
         TempSalesShipmentBuffer: Record "Sales Shipment Buffer" temporary;
-        HasShipment: Boolean;
     begin
         if not SalesInvoiceHeader.Get(SalesInvoiceNo) then
-            exit(false);
+            exit;
         if not SalesInvoiceLine.Get(SalesInvoiceNo, SalesInvoiceLineNo) then
-            exit(false);
+            exit;
 
         // W1 resolves actual posted invoice/ledger quantities to their source
         // shipments. These links are stable after posting, unlike the remaining
@@ -1040,11 +1039,8 @@ codeunit 12184 "Fattura Doc. Helper"
                         SalesShipmentHeader."No.", SalesShipmentHeader."Shipment Date",
                         SalesShipmentHeader."Fattura Project Code", SalesShipmentHeader."Fattura Tender Code",
                         SalesShipmentHeader."Customer Purchase Order No.", false);
-                    HasShipment := true;
                 end;
             until TempSalesShipmentBuffer.Next() = 0;
-
-        exit(HasShipment);
     end;
 
     local procedure CollectVATOnLines(
