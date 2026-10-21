@@ -476,6 +476,130 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PreviewMatchesPostedTwoShipmentsForOneInvoiceLine()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        SalesShipmentLine: Record "Sales Shipment Line";
+        SalesShipmentHeader: Record "Sales Shipment Header";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        FirstShipmentNo: Code[20];
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'First shipment was not posted.');
+        FirstShipmentNo := SalesShipmentLine."Document No.";
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 3);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        // Change the line date only to verify that XML uses the authoritative
+        // shipment-header date rather than incidental per-line date values.
+        SalesShipmentLine.SetRange("Document No.", FirstShipmentNo);
+        SalesShipmentLine.FindFirst();
+        SalesShipmentHeader.Get(FirstShipmentNo);
+        if SalesShipmentLine."Shipment Date" = SalesShipmentHeader."Shipment Date" then begin
+            SalesShipmentLine."Shipment Date" := CalcDate('<+1D>', SalesShipmentHeader."Shipment Date");
+            SalesShipmentLine.Modify();
+        end;
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 0);
+        SalesLine.Validate("Qty. to Invoice", 5);
+        SalesLine.Modify(true);
+        SalesHeader.Validate(Ship, false);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+        Commit();
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        Assert.AreEqual(2, TempFatturaLine.Count(), 'Expected both DDTs for one invoice line.');
+        if TempFatturaLine.FindSet() then
+            repeat
+                Assert.AreEqual(1, TempFatturaLine."Related Line No.",
+                    'Both DDTs must reference the same commercial line.');
+            until TempFatturaLine.Next() = 0;
+
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewMatchesPostedShipmentsAcrossTwoInvoiceLines()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        LibraryInventory: Codeunit "Library - Inventory";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        LibrarySales.CreateSalesLine(
+            SalesLine, SalesHeader, SalesLine.Type::Item, LibraryInventory.CreateItemNo(), 2);
+        SalesLine.Validate("Unit Price", 10);
+        SalesLine.Modify(true);
+
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindSet();
+        repeat
+            SalesLine.Validate("Qty. to Ship", SalesLine.Quantity);
+            SalesLine.Validate("Qty. to Invoice", 0);
+            SalesLine.Modify(true);
+        until SalesLine.Next() = 0;
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindSet();
+        repeat
+            SalesLine.Validate("Qty. to Ship", 0);
+            SalesLine.Validate("Qty. to Invoice", SalesLine.Quantity);
+            SalesLine.Modify(true);
+        until SalesLine.Next() = 0;
+        SalesHeader.Validate(Ship, false);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+        Commit();
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        Assert.AreEqual(2, TempFatturaLine.Count(), 'Expected one shipment reference per invoice line.');
+        Assert.IsTrue(TempFatturaLine.FindFirst(), 'First shipment reference is missing.');
+        Assert.AreEqual(1, TempFatturaLine."Related Line No.", 'First shipment references the wrong invoice line.');
+        Assert.IsTrue(TempFatturaLine.Next() <> 0, 'Second shipment reference is missing.');
+        Assert.AreEqual(2, TempFatturaLine."Related Line No.", 'Second shipment references the wrong invoice line.');
+
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
     procedure PreviewCreditMemoIncludesKnownAppliedInvoice()
     var
         SalesHeader: Record "Sales Header";
