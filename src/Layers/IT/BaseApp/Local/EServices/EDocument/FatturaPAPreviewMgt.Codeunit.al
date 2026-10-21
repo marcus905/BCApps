@@ -134,7 +134,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         var TempFatturaHeader: Record "Fattura Header" temporary)
     var
         AppliedCustLedgerEntry: Record "Cust. Ledger Entry";
-        AppliedSalesInvoice: Record "Sales Invoice Header";
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
         AppliedCustLedgerEntry.SetRange("Customer No.", SalesHeader."Bill-to Customer No.");
         AppliedCustLedgerEntry.SetRange("Document Type", AppliedCustLedgerEntry."Document Type"::Invoice);
@@ -142,12 +142,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         if not AppliedCustLedgerEntry.FindFirst() then
             exit;
 
-        TempFatturaHeader."Applied Doc. No." := AppliedCustLedgerEntry."Document No.";
-        TempFatturaHeader."Applied Posting Date" := AppliedCustLedgerEntry."Posting Date";
-        if AppliedSalesInvoice.Get(AppliedCustLedgerEntry."Document No.") then begin
-            TempFatturaHeader."Appl. Fattura Project Code" := AppliedSalesInvoice."Fattura Project Code";
-            TempFatturaHeader."Appl. Fattura Tender Code" := AppliedSalesInvoice."Fattura Tender Code";
-        end;
+        FatturaDocHelper.PopulateAppliedDocumentInformation(TempFatturaHeader, AppliedCustLedgerEntry);
     end;
 
     local procedure BuildSourceReferences(
