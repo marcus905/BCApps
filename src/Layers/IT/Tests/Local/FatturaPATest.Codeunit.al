@@ -418,6 +418,33 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PreviewMatchesPostedInvoiceFromGetShipmentLines()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesShipmentLine: Record "Sales Shipment Line";
+        SalesGetShipment: Codeunit "Sales-Get Shipment";
+        CustomerNo: Code[20];
+    begin
+        Initialize();
+        CustomerNo := CreateCustomer();
+        CreateAndPostSalesOrderAsShipment(CustomerNo, 1);
+        CreateAndPostSalesOrderAsShipment(CustomerNo, 2);
+
+        LibrarySales.CreateSalesHeader(SalesHeader, SalesHeader."Document Type"::Invoice, CustomerNo);
+        SalesHeader.Validate("Payment Method Code", CreatePaymentMethod());
+        SalesHeader.Validate("Payment Terms Code", CreatePaymentTerms());
+        SalesHeader.Validate("Customer Purchase Order No.", 'PO-GET-SHIPMENT');
+        SalesHeader.Modify(true);
+
+        SalesShipmentLine.SetRange("Sell-to Customer No.", CustomerNo);
+        SalesGetShipment.SetSalesHeader(SalesHeader);
+        SalesGetShipment.CreateInvLines(SalesShipmentLine);
+        Commit();
+
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
     procedure PreviewMatchesPostedInvoiceCustomerOrderReferences()
     var
         SalesHeader: Record "Sales Header";
