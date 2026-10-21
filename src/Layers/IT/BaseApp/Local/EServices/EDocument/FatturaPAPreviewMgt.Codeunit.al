@@ -167,8 +167,8 @@ codeunit 12285 "FatturaPA Preview Mgt."
         SalesShipmentHeader: Record "Sales Shipment Header";
         TempShipmentBuffer: Record "Fattura Line" temporary;
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
-        ShipmentLineNo: Integer;
         HasShipmentReference: Boolean;
+        FatturaLineNo: Integer;
     begin
         TempFatturaHeader.Reset();
         if not TempFatturaHeader.FindFirst() then
@@ -181,8 +181,9 @@ codeunit 12285 "FatturaPA Preview Mgt."
             SalesLine.SetFilter("Qty. to Invoice", '<>0');
             if SalesLine.FindSet() then
                 repeat
+                    FatturaLineNo += 1;
                     AddPendingShipmentReferences(
-                        SalesHeader, SalesLine, TempShipmentBuffer, ShipmentLineNo, HasShipmentReference);
+                        SalesHeader, SalesLine, TempShipmentBuffer, FatturaLineNo, HasShipmentReference);
                 until SalesLine.Next() = 0;
         end;
 
@@ -213,7 +214,7 @@ codeunit 12285 "FatturaPA Preview Mgt."
         SalesHeader: Record "Sales Header";
         SalesLine: Record "Sales Line";
         var TempShipmentBuffer: Record "Fattura Line" temporary;
-        var ShipmentLineNo: Integer;
+        FatturaLineNo: Integer;
         var HasShipmentReference: Boolean)
     var
         SalesShipmentLine: Record "Sales Shipment Line";
@@ -233,10 +234,9 @@ codeunit 12285 "FatturaPA Preview Mgt."
                 UninvoicedShipmentQty := Abs(SalesShipmentLine.Quantity) - Abs(SalesShipmentLine."Quantity Invoiced");
                 if (QuantityToMatch > 0) and (UninvoicedShipmentQty > 0) then
                     if SalesShipmentHeader.Get(SalesShipmentLine."Document No.") then begin
-                        ShipmentLineNo += 1;
                         FatturaDocHelper.InsertShipmentBuffer(
-                            TempShipmentBuffer, Format(SalesLine.Type::Item), ShipmentLineNo,
-                            SalesShipmentLine."Document No.", SalesShipmentLine."Shipment Date",
+                            TempShipmentBuffer, Format(SalesLine.Type::Item), FatturaLineNo,
+                            SalesShipmentLine."Document No.", SalesShipmentHeader."Shipment Date",
                             SalesShipmentHeader."Fattura Project Code",
                             SalesShipmentHeader."Fattura Tender Code",
                             SalesShipmentHeader."Customer Purchase Order No.", false);
