@@ -1436,6 +1436,38 @@ codeunit 12184 "Fattura Doc. Helper"
     /// processing used by posted sales invoice and credit memo lines.
     /// Orders can supply the quantity and line amount actually being invoiced.
     /// </summary>
+    /// <summary>
+    /// Common eligibility for an unposted sales line to become a fiscal
+    /// commercial line. Reused when building DDT line references.
+    /// </summary>
+    procedure ShouldIncludePreviewSalesLine(
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        EffectiveQuantity: Decimal): Boolean
+    var
+        LineRecRef: RecordRef;
+    begin
+        if SalesLine.Type = SalesLine.Type::" " then
+            exit(false);
+        if (SalesHeader."Document Type" = SalesHeader."Document Type"::Order) and
+           (EffectiveQuantity = 0)
+        then
+            exit(false);
+
+        exit(ShouldIncludePreviewSalesLineForSource(SalesLine));
+    end;
+
+    local procedure ShouldIncludePreviewSalesLineForSource(SalesLine: Record "Sales Line"): Boolean
+    var
+        LineRecRef: RecordRef;
+    begin
+        if SalesLine.Type = SalesLine.Type::" " then
+            exit(false);
+        Initialize();
+        LineRecRef.GetTable(SalesLine);
+        exit(not IsSplitPaymentLine(LineRecRef));
+    end;
+
     procedure InsertPreviewSalesLine(
         var TempFatturaLine: Record "Fattura Line" temporary;
         var DocLineNo: Integer;
@@ -1449,13 +1481,10 @@ codeunit 12184 "Fattura Doc. Helper"
         InvDiscAmountByQty: Decimal;
     begin
         Initialize();
-        if SalesLine.Type = SalesLine.Type::" " then
+        if not ShouldIncludePreviewSalesLineForSource(SalesLine) then
             exit;
 
         LineRecRef.GetTable(SalesLine);
-        // Standard posted export omits the synthetic Full-VAT split-payment line.
-        if IsSplitPaymentLine(LineRecRef) then
-            exit;
 
         if SalesLine.Quantity <> 0 then
             InvDiscAmountByQty := SalesLine."Inv. Discount Amount" / SalesLine.Quantity;
