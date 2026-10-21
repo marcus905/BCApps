@@ -330,6 +330,41 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PreviewMatchesPostedPartiallyInvoicedOrderWithInvoiceDiscount()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        SalesLine.TestField(Quantity, 5);
+        SalesLine.Validate("Inv. Discount Amount", 5);
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 2);
+        SalesLine.Modify(true);
+        SalesHeader.Validate(Ship, true);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+        Commit();
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaHeader.FindFirst();
+        Assert.AreEqual(2, TempFatturaHeader."Total Inv. Discount",
+            'Partial order preview must prorate the invoice discount to quantity 2 of 5.');
+
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
     procedure PreviewIncludesCalculatedInvoiceDiscount()
     var
         SalesHeader: Record "Sales Header";
@@ -866,6 +901,8 @@ codeunit 144200 "FatturaPA Test"
             BodyPath + '/DatiGenerali/DatiGeneraliDocumento/Divisa');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML,
             BodyPath + '/DatiGenerali/DatiGeneraliDocumento/ImportoTotaleDocumento');
+        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+            BodyPath + '/DatiGenerali/DatiGeneraliDocumento/ScontoMaggiorazione/Importo');
         AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Descrizione');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Quantita');
         AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/UnitaMisura');
