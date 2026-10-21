@@ -559,12 +559,24 @@ codeunit 12184 "Fattura Doc. Helper"
     var
         CustLedgerEntry: Record "Cust. Ledger Entry";
         AppliedCustLedgerEntry: Record "Cust. Ledger Entry";
-        DocRecRef: RecordRef;
     begin
         FindCustLedgEntry(CustLedgerEntry, TempFatturaHeader);
         if not FindAppliedEntry(AppliedCustLedgerEntry, CustLedgerEntry) then
             exit;
 
+        PopulateAppliedDocumentInformation(TempFatturaHeader, AppliedCustLedgerEntry);
+    end;
+
+    /// <summary>
+    /// Maps a resolved application to FatturaPA fiscal metadata in both posted
+    /// export and preview. The caller determines which ledger entry is applied.
+    /// </summary>
+    procedure PopulateAppliedDocumentInformation(
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        AppliedCustLedgerEntry: Record "Cust. Ledger Entry")
+    var
+        DocRecRef: RecordRef;
+    begin
         TempFatturaHeader."Applied Doc. No." := AppliedCustLedgerEntry."Document No.";
         TempFatturaHeader."Applied Posting Date" := AppliedCustLedgerEntry."Posting Date";
 
@@ -583,11 +595,19 @@ codeunit 12184 "Fattura Doc. Helper"
         VATEntry.SetRange("Document No.", TempFatturaHeader."Document No.");
         VATEntry.SetRange("Posting Date", TempFatturaHeader."Posting Date");
         if VATEntry.FindFirst() then
-            if VATEntry."Tax Representative Type" <> 0 then begin
-                TempFatturaHeader."Tax Representative Type" := VATEntry."Tax Representative Type";
-                TempFatturaHeader."Tax Representative No." := VATEntry."Tax Representative No.";
-            end;
+            ApplyTaxRepresentativeFromVATEntry(TempFatturaHeader, VATEntry)
+        else
+            ApplyCompanyTaxRepresentativeFallback(TempFatturaHeader);
+    end;
 
+    local procedure ApplyTaxRepresentativeFromVATEntry(
+        var TempFatturaHeader: Record "Fattura Header" temporary;
+        VATEntry: Record "VAT Entry")
+    begin
+        if VATEntry."Tax Representative Type" <> 0 then begin
+            TempFatturaHeader."Tax Representative Type" := VATEntry."Tax Representative Type";
+            TempFatturaHeader."Tax Representative No." := VATEntry."Tax Representative No.";
+        end;
         ApplyCompanyTaxRepresentativeFallback(TempFatturaHeader);
     end;
 
@@ -1212,11 +1232,9 @@ codeunit 12184 "Fattura Doc. Helper"
         CompanyInformation.Get();
         TempVATEntry.Reset();
         if TempVATEntry.FindFirst() then
-            if TempVATEntry."Tax Representative Type" <> 0 then begin
-                TempFatturaHeader."Tax Representative Type" := TempVATEntry."Tax Representative Type";
-                TempFatturaHeader."Tax Representative No." := TempVATEntry."Tax Representative No.";
-            end;
-        ApplyCompanyTaxRepresentativeFallback(TempFatturaHeader);
+            ApplyTaxRepresentativeFromVATEntry(TempFatturaHeader, TempVATEntry)
+        else
+            ApplyCompanyTaxRepresentativeFallback(TempFatturaHeader);
     end;
 
     local procedure BuildOrderDataBuffer(var TempFatturaLine: Record "Fattura Line" temporary; var TempShptFatturaLine: Record "Fattura Line" temporary; TempFatturaHeader: Record "Fattura Header" temporary)
