@@ -103,7 +103,12 @@ codeunit 12285 "FatturaPA Preview Mgt."
         TempFatturaHeader."Customer Purchase Order No." := SalesHeader."Customer Purchase Order No.";
         TempFatturaHeader."Currency Code" := SalesHeader."Currency Code";
         TempFatturaHeader."Currency Factor" := SalesHeader."Currency Factor";
-        TempFatturaHeader."Total Inv. Discount" := ConvertToLCY(SalesHeader, SalesHeader."Invoice Discount Amount");
+        if SalesHeader."Document Type" = SalesHeader."Document Type"::Order then
+            TempFatturaHeader."Total Inv. Discount" :=
+                ConvertToLCY(SalesHeader, GetOrderInvoiceDiscountToInvoice(SalesHeader))
+        else
+            TempFatturaHeader."Total Inv. Discount" :=
+                ConvertToLCY(SalesHeader, SalesHeader."Invoice Discount Amount");
         TempFatturaHeader."Fattura Stamp" := SalesHeader."Fattura Stamp";
         TempFatturaHeader."Fattura Stamp Amount" := SalesHeader."Fattura Stamp Amount";
         TempFatturaHeader."Entry Type" := TempFatturaHeader."Entry Type"::Sales;
@@ -297,6 +302,25 @@ codeunit 12285 "FatturaPA Preview Mgt."
             exit(AllowedQtyToInvoice);
 
         exit(SalesLine."Qty. to Invoice");
+    end;
+
+    local procedure GetOrderInvoiceDiscountToInvoice(SalesHeader: Record "Sales Header"): Decimal
+    var
+        SalesLine: Record "Sales Line";
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+        EffectiveQuantity: Decimal;
+        TotalDiscount: Decimal;
+    begin
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        if SalesLine.FindSet() then
+            repeat
+                EffectiveQuantity := GetEffectiveQtyToInvoice(SalesHeader, SalesLine);
+                if FatturaDocHelper.ShouldIncludePreviewSalesLine(SalesHeader, SalesLine, EffectiveQuantity) then
+                    TotalDiscount += FatturaDocHelper.ProrateFatturaInvoiceDiscount(
+                        SalesLine."Inv. Discount Amount", SalesLine.Quantity, EffectiveQuantity);
+            until SalesLine.Next() = 0;
+        exit(TotalDiscount);
     end;
 
     local procedure CalcOrderLineAmountToInvoice(
