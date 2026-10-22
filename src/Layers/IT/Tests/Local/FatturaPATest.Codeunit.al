@@ -365,6 +365,20 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure FatturaPartialDiscountUsesCurrencyPrecision()
+    var
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        Initialize();
+        Assert.AreEqual(0.33, FatturaDocHelper.ProrateFatturaInvoiceDiscount(1, 3, 1, 0.01),
+            'A one-of-three partial discount must use currency amount rounding.');
+        Assert.AreEqual(0.66,
+            FatturaDocHelper.ProrateFatturaInvoiceDiscount(1, 3, 1, 0.01) +
+            FatturaDocHelper.ProrateFatturaInvoiceDiscount(1, 3, 1, 0.01),
+            'Each line must be rounded before summing the header discount.');
+    end;
+
+    [Test]
     procedure PreviewIncludesCalculatedInvoiceDiscount()
     var
         SalesHeader: Record "Sales Header";
@@ -457,8 +471,13 @@ codeunit 144200 "FatturaPA Test"
     var
         SalesHeader: Record "Sales Header";
         SalesShipmentLine: Record "Sales Shipment Line";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
         SalesGetShipment: Codeunit "Sales-Get Shipment";
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
         CustomerNo: Code[20];
+        CommercialLineCount: Integer;
+        ReferenceCount: Integer;
     begin
         Initialize();
         CustomerNo := CreateCustomer();
@@ -475,6 +494,20 @@ codeunit 144200 "FatturaPA Test"
         SalesGetShipment.SetSalesHeader(SalesHeader);
         SalesGetShipment.CreateInvLines(SalesShipmentLine);
         Commit();
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Document);
+        CommercialLineCount := TempFatturaLine.Count();
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        if TempFatturaLine.FindSet() then
+            repeat
+                ReferenceCount += 1;
+                Assert.IsTrue(
+                    (TempFatturaLine."Related Line No." > 0) and
+                    (TempFatturaLine."Related Line No." <= CommercialLineCount),
+                    'A DDT reference points outside the commercial line range.');
+            until TempFatturaLine.Next() = 0;
+        Assert.IsTrue(ReferenceCount > 0, 'Expected known DDT references.');
 
         ComparePreviewAndPostedFatturaPA(SalesHeader);
     end;
