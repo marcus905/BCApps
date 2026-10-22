@@ -1062,6 +1062,9 @@ codeunit 12184 "Fattura Doc. Helper"
         // invoiced quantity. Historical FIFO reconstruction can associate the
         // wrong DDT after Get Shipment Lines or backdated later shipments.
         TempSalesShipmentBuffer.GetLinesForSalesInvoiceLine(SalesInvoiceLine, SalesInvoiceHeader);
+        // W1's AddBufferEntry leaves its lookup filters set to the last DDT.
+        // Reset them before enumerating the complete actual value-entry mapping.
+        TempSalesShipmentBuffer.Reset();
         if TempSalesShipmentBuffer.FindSet() then
             repeat
                 InsertSalesShipmentReference(
