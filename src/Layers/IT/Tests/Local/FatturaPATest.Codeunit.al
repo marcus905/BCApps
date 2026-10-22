@@ -1987,8 +1987,8 @@ codeunit 144200 "FatturaPA Test"
           ClientFileName, SalesInvoiceHeader, CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
 
         // [THEN] The DatiGenerali node has two DatiOrdineAcquisto nodes.
-        // [THEN] First DatiOrdineAcquisto node has RiferimentoNumeroLinea = 2 and IdDocumento = "X".
-        // [THEN] Second DatiOrdineAcquisto node has RiferimentoNumeroLinea = 4, RiferimentoNumeroLinea = 5 and IdDocumento = "SO2" number.
+        // [THEN] DDT references identify exported commercial lines 1, 2 and 3,
+        // not source-line ordinals 2, 4 and 5 that include Get Shipment Lines descriptions.
         SalesInvoiceHeader.Get(PostedInvNo);
         VerifyDatiOrdineAcquistoForMultipleShipments(TempBlob, SalesInvoiceHeader."Customer Purchase Order No.");
 
@@ -3966,11 +3966,11 @@ codeunit 144200 "FatturaPA Test"
     begin
         LibraryITLocalization.LoadTempXMLBufferFromTempBlob(TempXMLBuffer, TempBlob);
         TempXMLBuffer.FindNodesByXPath(TempXMLBuffer, '/p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiOrdineAcquisto');
-        AssertElementValue(TempXMLBuffer, 'RiferimentoNumeroLinea', '2');
+        AssertElementValue(TempXMLBuffer, 'RiferimentoNumeroLinea', '1');
         AssertElementValue(TempXMLBuffer, 'IdDocumento', DocumentNo);
         FindNextElement(TempXMLBuffer);
-        AssertElementValue(TempXMLBuffer, 'RiferimentoNumeroLinea', '4');
-        AssertElementValue(TempXMLBuffer, 'RiferimentoNumeroLinea', '5');
+        AssertElementValue(TempXMLBuffer, 'RiferimentoNumeroLinea', '2');
+        AssertElementValue(TempXMLBuffer, 'RiferimentoNumeroLinea', '3');
         AssertElementValue(TempXMLBuffer, 'IdDocumento', DocumentNo);
     end;
 
