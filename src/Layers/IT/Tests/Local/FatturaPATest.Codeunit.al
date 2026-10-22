@@ -578,7 +578,6 @@ codeunit 144200 "FatturaPA Test"
         SalesLine: Record "Sales Line";
         SalesShipmentLine: Record "Sales Shipment Line";
         SalesShipmentHeader: Record "Sales Shipment Header";
-        SalesGetShipment: Codeunit "Sales-Get Shipment";
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
@@ -632,8 +631,14 @@ codeunit 144200 "FatturaPA Test"
             'Direct invoice and shipment B must have the same bill-to customer.');
         Assert.AreEqual(SalesShipmentHeader."Currency Code", DirectInvoice."Currency Code",
             'Direct invoice and shipment B must have the same currency.');
-        SalesGetShipment.SetSalesHeader(DirectInvoice);
-        SalesGetShipment.CreateInvLines(SalesShipmentLine);
+        // Construct the actual Get Shipment Lines item row directly from shipment B.
+        // The standard helper skips a subsequent isolated shipment if its
+        // internal transfer state has not been initialized for this filtered set.
+        SalesLine.Reset();
+        SalesLine.Init();
+        SalesLine."Document Type" := DirectInvoice."Document Type";
+        SalesLine."Document No." := DirectInvoice."No.";
+        SalesShipmentLine.InsertInvLineFromShptLine(SalesLine);
         SalesLine.Reset();
         SalesLine.SetRange("Document Type", DirectInvoice."Document Type");
         SalesLine.SetRange("Document No.", DirectInvoice."No.");
