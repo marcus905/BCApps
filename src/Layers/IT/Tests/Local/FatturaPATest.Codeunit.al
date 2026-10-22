@@ -624,8 +624,27 @@ codeunit 144200 "FatturaPA Test"
         SalesShipmentLine.SetRange("Document No.", SecondShipmentNo);
         SalesGetShipment.SetSalesHeader(DirectInvoice);
         SalesGetShipment.CreateInvLines(SalesShipmentLine);
+        SalesLine.Reset();
+        SalesLine.SetRange("Document Type", DirectInvoice."Document Type");
+        SalesLine.SetRange("Document No.", DirectInvoice."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        Assert.IsTrue(SalesLine.FindFirst(), 'Get Shipment Lines did not insert the B invoice line.');
+        Assert.AreEqual(SecondShipmentNo, SalesLine."Shipment No.",
+            'The intermediate invoice must consume shipment B, not A.');
         Commit();
         LibrarySales.PostSalesDocument(DirectInvoice, false, true);
+
+        SalesShipmentLine.Reset();
+        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+        SalesShipmentLine.SetRange("Document No.", FirstShipmentNo);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Shipment A line missing.');
+        Assert.AreEqual(2, SalesShipmentLine."Qty. Shipped Not Invoiced",
+            'Shipment A must remain entirely available after B was invoiced.');
+        SalesShipmentLine.SetRange("Document No.", SecondShipmentNo);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Shipment B line missing.');
+        Assert.AreEqual(0, SalesShipmentLine."Qty. Shipped Not Invoiced",
+            'Shipment B must be fully invoiced before testing the later order invoice.');
 
         SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
         SalesLine.FindFirst();
@@ -639,6 +658,7 @@ codeunit 144200 "FatturaPA Test"
 
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
         TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        Assert.AreEqual(1, TempFatturaLine.Count(), 'Exactly one active DDT must be invoiced.');
         TempFatturaLine.SetRange("Document No.", FirstShipmentNo);
         Assert.IsFalse(TempFatturaLine.IsEmpty(), 'Preview omitted still-uninvoiced shipment A.');
         TempFatturaLine.SetRange("Document No.", SecondShipmentNo);
@@ -683,6 +703,14 @@ codeunit 144200 "FatturaPA Test"
         UndoSalesShipmentLine.SetHideDialog(true);
         UndoSalesShipmentLine.Run(SalesShipmentLine);
 
+        SalesShipmentLine.Reset();
+        SalesShipmentLine.SetRange("Document No.", UndoneShipmentNo);
+        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Original shipment line missing after undo.');
+        Assert.IsTrue(SalesShipmentLine.Correction, 'W1 undo must mark the original line corrected.');
+        Assert.AreEqual(0, SalesShipmentLine."Qty. Shipped Not Invoiced",
+            'An undone shipment must no longer be invoiceable.');
+
         SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
         SalesLine.FindFirst();
         SalesLine.Validate("Qty. to Ship", 2);
@@ -711,6 +739,7 @@ codeunit 144200 "FatturaPA Test"
 
         FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
         TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        Assert.AreEqual(1, TempFatturaLine.Count(), 'Expected only the replacement DDT.');
         TempFatturaLine.SetRange("Document No.", UndoneShipmentNo);
         Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Preview included an undone DDT.');
         TempFatturaLine.SetRange("Document No.", ReplacementShipmentNo);
