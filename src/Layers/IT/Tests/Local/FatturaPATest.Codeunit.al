@@ -577,6 +577,7 @@ codeunit 144200 "FatturaPA Test"
         DirectInvoice: Record "Sales Header";
         SalesLine: Record "Sales Line";
         SalesShipmentLine: Record "Sales Shipment Line";
+        SalesShipmentHeader: Record "Sales Shipment Header";
         SalesGetShipment: Codeunit "Sales-Get Shipment";
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
@@ -621,7 +622,16 @@ codeunit 144200 "FatturaPA Test"
         DirectInvoice.Validate("Payment Method Code", CreatePaymentMethod());
         DirectInvoice.Validate("Payment Terms Code", CreatePaymentTerms());
         DirectInvoice.Modify(true);
+        SalesShipmentLine.Reset();
         SalesShipmentLine.SetRange("Document No.", SecondShipmentNo);
+        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+        SalesShipmentLine.SetFilter("Qty. Shipped Not Invoiced", '>0');
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Shipment B is not invoiceable.');
+        SalesShipmentHeader.Get(SecondShipmentNo);
+        Assert.AreEqual(SalesShipmentHeader."Bill-to Customer No.", DirectInvoice."Bill-to Customer No.",
+            'Direct invoice and shipment B must have the same bill-to customer.');
+        Assert.AreEqual(SalesShipmentHeader."Currency Code", DirectInvoice."Currency Code",
+            'Direct invoice and shipment B must have the same currency.');
         SalesGetShipment.SetSalesHeader(DirectInvoice);
         SalesGetShipment.CreateInvLines(SalesShipmentLine);
         SalesLine.Reset();
