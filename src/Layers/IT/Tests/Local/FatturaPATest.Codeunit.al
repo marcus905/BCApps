@@ -3060,7 +3060,7 @@ codeunit 144200 "FatturaPA Test"
 
     [Test]
     [Scope('OnPrem')]
-    procedure VerifyExportedSalesInvoiceEsigibilitaIVATagWhenCoomentLineExist()
+    procedure VerifyExportedSalesInvoiceEsigibilitaIVATagWhenCommentLineExists()
     var
         TempXMLBuffer: Record "XML Buffer" temporary;
         SalesInvoiceHeader: Record "Sales Invoice Header";
