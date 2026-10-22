@@ -174,10 +174,12 @@ codeunit 12285 "FatturaPA Preview Mgt."
             SalesLine.SetRange("Document No.", SalesHeader."No.");
             if SalesLine.FindSet() then
                 repeat
+                    // Posted Get Shipment Lines exports use the original source-line
+                    // ordinal, including comment/split lines, for fiscal references.
+                    FatturaLineNo += 1;
                     if FatturaDocHelper.ShouldIncludePreviewSalesLine(
                         SalesHeader, SalesLine, GetEffectiveQtyToInvoice(SalesHeader, SalesLine))
                     then begin
-                        FatturaLineNo += 1;
                         if (SalesLine.Type = SalesLine.Type::Item) and
                            (SalesLine."Shipment No." <> '')
                         then
@@ -345,7 +347,10 @@ codeunit 12285 "FatturaPA Preview Mgt."
 
         exit(
             Round(
-                SalesLine.Amount * EffectiveQty / SalesLine.Quantity,
+                // Standard posted export uses "Line Amount" before separately
+                // applying "Inv. Discount Amount" in PopulateFatturaLineAmounts.
+                // SalesLine.Amount is already net of that invoice discount.
+                SalesLine."Line Amount" * EffectiveQty / SalesLine.Quantity,
                 Precision));
     end;
 
