@@ -635,6 +635,8 @@ codeunit 144200 "FatturaPA Test"
         // The standard helper skips a subsequent isolated shipment if its
         // internal transfer state has not been initialized for this filtered set.
         SalesLine.Reset();
+        SalesLine.SetRange("Document Type", DirectInvoice."Document Type");
+        SalesLine.SetRange("Document No.", DirectInvoice."No.");
         SalesLine.Init();
         SalesLine."Document Type" := DirectInvoice."Document Type";
         SalesLine."Document No." := DirectInvoice."No.";
@@ -662,7 +664,11 @@ codeunit 144200 "FatturaPA Test"
             'Shipment B must be fully invoiced before testing the later order invoice.');
 
         SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
-        SalesLine.FindFirst();
+        SalesLine.Reset();
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        Assert.IsTrue(SalesLine.FindFirst(), 'Original order line missing after B invoice.');
         SalesLine.Validate("Qty. to Ship", 0);
         SalesLine.Validate("Qty. to Invoice", 2);
         SalesLine.Modify(true);
