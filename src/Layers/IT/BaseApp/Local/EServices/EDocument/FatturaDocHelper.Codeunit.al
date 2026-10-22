@@ -1112,8 +1112,9 @@ codeunit 12184 "Fattura Doc. Helper"
         if QuantityToInvoice <= 0 then
             exit;
 
-        // Prior applications belong to individual shipment lines, not a global
-        // FIFO offset. Exclude negative correction lines and fully undone DDTs.
+        // Use W1's shipment-specific remaining invoiceable quantity.
+        // Undo Shipment marks both the original and reversing line as Correction.
+        // This is an acquisition adapter; the shared fiscal buffer logic follows.
         SalesShipmentLine.SetCurrentKey("Order No.", "Order Line No.", "Posting Date");
         SalesShipmentLine.SetRange("Order No.", OrderNo);
         SalesShipmentLine.SetRange("Order Line No.", OrderLineNo);
@@ -1122,7 +1123,7 @@ codeunit 12184 "Fattura Doc. Helper"
         SalesShipmentLine.SetFilter(Quantity, '>0');
         if SalesShipmentLine.FindSet() then
             repeat
-                AvailableQty := GetActiveUninvoicedShipmentQty(SalesShipmentLine);
+                AvailableQty := SalesShipmentLine."Qty. Shipped Not Invoiced";
                 if AvailableQty > 0 then
                     if InsertSalesShipmentReference(
                         TempShptFatturaLine, SalesShipmentLine."Document No.", FatturaLineNo, false)
@@ -1134,30 +1135,6 @@ codeunit 12184 "Fattura Doc. Helper"
                             QuantityToInvoice -= AvailableQty;
                     end;
             until (SalesShipmentLine.Next() = 0) or (QuantityToInvoice <= 0);
-    end;
-
-    local procedure GetActiveUninvoicedShipmentQty(SalesShipmentLine: Record "Sales Shipment Line"): Decimal
-    var
-        CorrectionLine: Record "Sales Shipment Line";
-        ActiveQty: Decimal;
-    begin
-        ActiveQty := SalesShipmentLine.Quantity - SalesShipmentLine."Quantity Invoiced";
-
-        // Undo Shipment adds a negative correction to the original shipment
-        // document. Excluding Correction=true alone would incorrectly retain
-        // the original undone quantity.
-        CorrectionLine.SetRange("Document No.", SalesShipmentLine."Document No.");
-        CorrectionLine.SetRange("Order No.", SalesShipmentLine."Order No.");
-        CorrectionLine.SetRange("Order Line No.", SalesShipmentLine."Order Line No.");
-        CorrectionLine.SetRange(Correction, true);
-        if CorrectionLine.FindSet() then
-            repeat
-                ActiveQty += CorrectionLine.Quantity;
-            until CorrectionLine.Next() = 0;
-
-        if ActiveQty < 0 then
-            exit(0);
-        exit(ActiveQty);
     end;
 
     local procedure CollectVATOnLines(
