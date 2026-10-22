@@ -571,6 +571,155 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PreviewUsesRemainingShipmentAfterOtherShipmentInvoicedFirst()
+    var
+        SalesHeader: Record "Sales Header";
+        DirectInvoice: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        SalesShipmentLine: Record "Sales Shipment Line";
+        SalesGetShipment: Codeunit "Sales-Get Shipment";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        FirstShipmentNo: Code[20];
+        SecondShipmentNo: Code[20];
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'First shipment missing.');
+        FirstShipmentNo := SalesShipmentLine."Document No.";
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 3);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        SalesShipmentLine.SetFilter("Document No.", '<>%1', FirstShipmentNo);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Second shipment missing.');
+        SecondShipmentNo := SalesShipmentLine."Document No.";
+
+        // Get Shipment Lines allows a subsequent shipment to be invoiced first.
+        LibrarySales.CreateSalesHeader(
+            DirectInvoice, DirectInvoice."Document Type"::Invoice, SalesHeader."Bill-to Customer No.");
+        DirectInvoice.Validate("Payment Method Code", CreatePaymentMethod());
+        DirectInvoice.Validate("Payment Terms Code", CreatePaymentTerms());
+        DirectInvoice.Modify(true);
+        SalesShipmentLine.SetRange("Document No.", SecondShipmentNo);
+        SalesGetShipment.SetSalesHeader(DirectInvoice);
+        SalesGetShipment.CreateInvLines(SalesShipmentLine);
+        Commit();
+        LibrarySales.PostSalesDocument(DirectInvoice, false, true);
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 0);
+        SalesLine.Validate("Qty. to Invoice", 2);
+        SalesLine.Modify(true);
+        SalesHeader.Validate(Ship, false);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+        Commit();
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        TempFatturaLine.SetRange("Document No.", FirstShipmentNo);
+        Assert.IsFalse(TempFatturaLine.IsEmpty(), 'Preview omitted still-uninvoiced shipment A.');
+        TempFatturaLine.SetRange("Document No.", SecondShipmentNo);
+        Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Preview reused already-invoiced shipment B.');
+
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
+    procedure PreviewOmitsUndoneShipmentAndUsesReplacement()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        SalesShipmentLine: Record "Sales Shipment Line";
+        UndoSalesShipmentLine: Codeunit "Undo Sales Shipment Line";
+        TempFatturaHeader: Record "Fattura Header" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
+        UndoneShipmentNo: Code[20];
+        ReplacementShipmentNo: Code[20];
+    begin
+        Initialize();
+        CreateSalesDocument(
+            SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
+            CreateCustomer(), SalesHeader."Document Type"::Order);
+        SalesLine.SetRange("Document Type", SalesHeader."Document Type");
+        SalesLine.SetRange("Document No.", SalesHeader."No.");
+        SalesLine.SetRange(Type, SalesLine.Type::Item);
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Shipment to undo was not posted.');
+        UndoneShipmentNo := SalesShipmentLine."Document No.";
+
+        SalesShipmentLine.SetRange("Document No.", UndoneShipmentNo);
+        UndoSalesShipmentLine.SetHideDialog(true);
+        UndoSalesShipmentLine.Run(SalesShipmentLine);
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 2);
+        SalesLine.Validate("Qty. to Invoice", 0);
+        SalesLine.Modify(true);
+        Commit();
+        LibrarySales.PostSalesDocument(SalesHeader, true, false);
+
+        SalesShipmentLine.Reset();
+        SalesShipmentLine.SetRange("Order No.", SalesHeader."No.");
+        SalesShipmentLine.SetRange(Type, SalesShipmentLine.Type::Item);
+        SalesShipmentLine.SetRange(Correction, false);
+        SalesShipmentLine.SetFilter("Document No.", '<>%1', UndoneShipmentNo);
+        Assert.IsTrue(SalesShipmentLine.FindFirst(), 'Replacement shipment missing.');
+        ReplacementShipmentNo := SalesShipmentLine."Document No.";
+
+        SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No.");
+        SalesLine.FindFirst();
+        SalesLine.Validate("Qty. to Ship", 0);
+        SalesLine.Validate("Qty. to Invoice", 2);
+        SalesLine.Modify(true);
+        SalesHeader.Validate(Ship, false);
+        SalesHeader.Validate(Invoice, true);
+        SalesHeader.Modify(true);
+        Commit();
+
+        FatturaPAPreviewMgt.PreparePreview(SalesHeader, 'PREVIEW', TempFatturaHeader, TempFatturaLine);
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
+        TempFatturaLine.SetRange("Document No.", UndoneShipmentNo);
+        Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Preview included an undone DDT.');
+        TempFatturaLine.SetRange("Document No.", ReplacementShipmentNo);
+        Assert.IsFalse(TempFatturaLine.IsEmpty(), 'Preview omitted replacement DDT.');
+
+        ComparePreviewAndPostedFatturaPA(SalesHeader);
+    end;
+
+    [Test]
     procedure PreviewMatchesPostedTwoShipmentsForOneInvoiceLine()
     var
         SalesHeader: Record "Sales Header";
