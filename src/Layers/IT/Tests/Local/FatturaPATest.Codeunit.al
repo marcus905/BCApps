@@ -1341,8 +1341,9 @@ codeunit 144200 "FatturaPA Test"
         asserterror ElectronicDocumentFormat.SendElectronically(
           TempBlob, ClientFileName, SalesInvoiceHeader, CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
 
-        // The page handler verifies the specific ISO validation message; also verify that the export failed with an error.
-        Assert.IsTrue(GetLastErrorText() <> '', 'FatturaPA export must raise an error for an invalid country ISO code.');
+        // ShowErrorMessages(true) displays the logged validation message and raises Error('') to roll back.
+        // The page handler verifies the specific ISO error, while this checks the expected rollback error.
+        Assert.AreEqual('', GetLastErrorText(), 'FatturaPA export must use the validation rollback error.');
     end;
 
     [PageHandler]
