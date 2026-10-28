@@ -1340,6 +1340,9 @@ codeunit 144200 "FatturaPA Test"
         // [WHEN] The document is exported to FatturaPA
         asserterror ElectronicDocumentFormat.SendElectronically(
           TempBlob, ClientFileName, SalesInvoiceHeader, CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
+
+        // The page handler verifies the specific ISO validation message; also verify that the export failed with an error.
+        Assert.IsTrue(GetLastErrorText() <> '', 'FatturaPA export must raise an error for an invalid country ISO code.');
     end;
 
     [PageHandler]
