@@ -63,6 +63,7 @@ codeunit 144200 "FatturaPA Test"
         SignatureXSDRelativePathTxt: Label '\GDL\IT\App\Test\XMLSchemas\xmldsig-core-schema.xsd', Locked = true;
         XSDRelativePathTxt: Label '\GDL\IT\App\Test\XMLSchemas\FatturaPA_1_2.xsd', Locked = true;
         InetRootRelativePathTxt: Label '..\', Locked = true;
+        BCAppsRelativePathTxt: Label '\App\BCApps\src', Locked = true;
         DescriptionTxt: Label 'Description Text';
 
     [Test]
@@ -1343,7 +1344,8 @@ codeunit 144200 "FatturaPA Test"
 
         // ShowErrorMessages(true) displays the logged validation message and raises Error('') to roll back.
         // The page handler verifies the specific ISO error, while this checks the expected rollback error.
-        Assert.AreEqual('', GetLastErrorText(), 'FatturaPA export must use the validation rollback error.');
+        Assert.ExpectedError('');
+        Assert.ExpectedErrorCode('Dialog');
     end;
 
     [PageHandler]
@@ -3164,7 +3166,7 @@ codeunit 144200 "FatturaPA Test"
         XsdPath: Text;
         InetRoot: Text;
     BEGIN
-        InetRoot := LibraryUtilityOnPrem.GetInetRoot() + InetRootRelativePathTxt;
+        InetRoot := LibraryUtilityOnPrem.GetInetRoot() + InetRootRelativePathTxt + BCAppsRelativePathTxt;
         SignatureXsdPath := InetRoot + SignatureXSDRelativePathTxt;
         XsdPath := InetRoot + XSDRelativePathTxt;
         LibraryVerifyXMLSchema.SetAdditionalSchemaPath(SignatureXsdPath);
