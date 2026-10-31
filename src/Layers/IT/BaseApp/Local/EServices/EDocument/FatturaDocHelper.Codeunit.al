@@ -68,6 +68,7 @@ codeunit 12184 "Fattura Doc. Helper"
         FatturaStampFieldNo: Integer;
         FatturaStampAmountFieldNo: Integer;
         MissingLinesErr: Label 'The document must contain lines in order to be sent through FatturaPA.';
+        MissingForeignFiscalIdentifierErr: Label 'A foreign customer must have either VAT Registration No. or Fiscal Code before an invoice or credit memo can be posted and sent through FatturaPA.';
         TxtTok: Label 'TXT%1', Locked = true;
         ExemptionDataMsg: Label '%1 del %2.', Locked = true;
         VATExemptionPrefixTok: Label 'Dich.Intento n.', Locked = true;
@@ -427,21 +428,26 @@ codeunit 12184 "Fattura Doc. Helper"
           PaymentTerms.Get(Format(HeaderRecRef.Field(PaymentTermsCodeFieldNo).Value()));
 
         CheckCompanyInformationFields(ErrorMessage);
-        ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo("PA Code"), ErrorMessage."Message Type"::Error);
         ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo("Country/Region Code"), ErrorMessage."Message Type"::Error);
         CheckFatturaPAISOCountryCode(Customer."Country/Region Code", Customer, Customer.FieldNo("Country/Region Code"), ErrorMessage);
         ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo(Address), ErrorMessage."Message Type"::Error);
-        ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo("Post Code"), ErrorMessage."Message Type"::Error);
+        if not IsForeignCustomer(Customer) then
+            ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo("Post Code"), ErrorMessage."Message Type"::Error);
         ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo(City), ErrorMessage."Message Type"::Error);
         if Customer."Individual Person" then begin
             ErrorMessage.LogIfEmpty(
               Customer, Customer.FieldNo("Last Name"), ErrorMessage."Message Type"::Error);
             ErrorMessage.LogIfEmpty(
               Customer, Customer.FieldNo("First Name"), ErrorMessage."Message Type"::Error);
-            ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo("Fiscal Code"), ErrorMessage."Message Type"::Error);
+            if not IsForeignCustomer(Customer) then
+                ErrorMessage.LogIfEmpty(Customer, Customer.FieldNo("Fiscal Code"), ErrorMessage."Message Type"::Error);
         end else
             ErrorMessage.LogIfEmpty(
               Customer, Customer.FieldNo(Name), ErrorMessage."Message Type"::Error);
+
+        if IsForeignCustomer(Customer) and not HasForeignFiscalIdentifier(Customer) then
+            ErrorMessage.LogMessage(
+              Customer, Customer.FieldNo("Fiscal Code"), ErrorMessage."Message Type"::Error, MissingForeignFiscalIdentifierErr);
 
         if TaxRepresentativeVendor.Get(CompanyInformation."Tax Representative No.") then begin
             ErrorMessage.LogIfEmpty(
@@ -472,6 +478,27 @@ codeunit 12184 "Fattura Doc. Helper"
 
         CheckFatturaPANos(ErrorMessage);
         OnAfterCheckMandatoryFields(HeaderRecRef, ErrorMessage);
+    end;
+
+    local procedure IsForeignCustomer(Customer: Record Customer): Boolean
+    var
+        CustomerCountryRegion: Record "Country/Region";
+        CompanyCountryRegion: Record "Country/Region";
+    begin
+        // Invalid country setup is reported by the regular validation errors.
+        // Avoid raising an exception here before the collected errors are displayed.
+        if not CustomerCountryRegion.Get(Customer."Country/Region Code") then
+            exit(false);
+        if not CompanyCountryRegion.Get(CompanyInformation."Country/Region Code") then
+            exit(false);
+        if (StrLen(CustomerCountryRegion."ISO Code") <> 2) or (StrLen(CompanyCountryRegion."ISO Code") <> 2) then
+            exit(false);
+        exit(CustomerCountryRegion."ISO Code" <> CompanyCountryRegion."ISO Code");
+    end;
+
+    local procedure HasForeignFiscalIdentifier(Customer: Record Customer): Boolean
+    begin
+        exit((Customer."VAT Registration No." <> '') or (Customer."Fiscal Code" <> ''));
     end;
 
     local procedure CheckCompanyInformationFields(var ErrorMessage: Record "Error Message")
@@ -700,7 +727,7 @@ codeunit 12184 "Fattura Doc. Helper"
 
     local procedure GetTransmissionType(Customer: Record Customer): Text[5]
     begin
-        if Customer.IsPublicCompany() then
+        if (Customer."Country/Region Code" = CompanyInformation."Country/Region Code") and Customer.IsPublicCompany() then
             exit('FPA12');
         exit(NonPublicCompanyLbl);
     end;
