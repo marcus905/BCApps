@@ -77,7 +77,11 @@ codeunit 12181 "FatturaPA Service Validation"
             exit;
         end;
 
-        if PassedInvoice then
+        // Standalone service invoices and credit memos are always invoiced, but
+        // Service-Post sets PassedInvoice for them only after this event.
+        if PassedInvoice or
+           (PassedServHeader."Document Type" in [PassedServHeader."Document Type"::Invoice, PassedServHeader."Document Type"::"Credit Memo"])
+        then
             FatturaPASalesValidation.AutoValidateDocument(
               PassedServHeader, PassedServHeader."Customer No.", DummyElectronicDocumentFormat.Usage::"Service Validation".AsInteger());
         ServFatturaSubscribers.AssignFatturaDocTypeFromVATPostingSetupToServiceHeader(PassedServHeader, true);
