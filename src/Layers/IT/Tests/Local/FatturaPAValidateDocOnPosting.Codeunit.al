@@ -20,6 +20,7 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
         LibraryErrorMessage: Codeunit "Library - Error Message";
         LibraryITLocalization: Codeunit "Library - IT Localization";
         IsInitialized: Boolean;
+        ForeignFiscalIdentifierErrorPageShown: Boolean;
         FatturaPATxt: Label 'FATTURAPA', Locked = true;
 
     [Test]
@@ -249,6 +250,7 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
     procedure SalesInvoice_EnabledValidate_ForeignCustomerWithoutFiscalIdentifier()
     var
         SalesHeader: Record "Sales Header";
+        SalesInvoiceHeader: Record "Sales Invoice Header";
         Customer: Record Customer;
         CountryRegion: Record "Country/Region";
     begin
@@ -271,12 +273,18 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
         CreateSalesDocument(SalesHeader, SalesHeader."Document Type"::Invoice, Customer."No.", CreatePaymentMethod());
 
         // [WHEN] Posting the invoice without either foreign fiscal identifier
-        asserterror PostSalesInvoiceUI(SalesHeader);
+        // The page action handles validation errors internally and need not throw.
+        ForeignFiscalIdentifierErrorPageShown := false;
+        PostSalesInvoiceUI(SalesHeader);
 
-        // [THEN] The FatturaPA-specific error-page handler verifies the missing-identifier message
-        // and the posting transaction is rolled back.
-        Assert.ExpectedError('');
-        Assert.ExpectedErrorCode('Dialog');
+        // [THEN] The error page shows the specific FatturaPA diagnostic,
+        // and no sales invoice has been posted.
+        Assert.IsTrue(ForeignFiscalIdentifierErrorPageShown, 'The missing foreign fiscal identifier error page was not shown.');
+        Assert.IsTrue(
+          SalesHeader.Get(SalesHeader."Document Type", SalesHeader."No."),
+          'The unposted sales invoice was unexpectedly deleted.');
+        SalesInvoiceHeader.SetRange("Pre-Assigned No.", SalesHeader."No.");
+        Assert.RecordIsEmpty(SalesInvoiceHeader);
     end;
 
     [Test]
@@ -1192,6 +1200,7 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
             until not ErrorMessages.Next();
 
         Assert.IsTrue(MissingIdentifierErrorFound, 'The FatturaPA missing foreign fiscal identifier diagnostic was not shown.');
+        ForeignFiscalIdentifierErrorPageShown := true;
     end;
 
     [PageHandler]
