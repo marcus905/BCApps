@@ -1395,7 +1395,7 @@ codeunit 144200 "FatturaPA Test"
         Initialize();
 
         // [GIVEN] Posted Sales Invoice for a foreign customer
-        LibraryERM.CreateCountryRegion(CountryRegion);
+        CreateCountryRegionWithISOCode(CountryRegion, 'GB');
         CustomerNo := CreateForeignCustomer(CountryRegion.Code);
         SalesInvoiceHeader.SetRange("No.", CreateAndPostSalesInvoice(DocumentRecRef, CreatePaymentMethod(), CreatePaymentTerms(), CustomerNo));
 
@@ -1768,7 +1768,7 @@ codeunit 144200 "FatturaPA Test"
 
         // [GIVEN]  "Country/Region Code" code is "IT" in Company Information
         // [GIVEN] A posted Sales Invoice with customer that has "Country/Region Code" = "GB" and "Fiscal Code" = "Y"
-        LibraryERM.CreateCountryRegion(CountryRegion);
+        CreateCountryRegionWithISOCode(CountryRegion, 'GB');
         Customer.Get(CreateCustomer());
         CurrCustomer := Customer;
         Customer.Validate("Country/Region Code", CountryRegion.Code);
