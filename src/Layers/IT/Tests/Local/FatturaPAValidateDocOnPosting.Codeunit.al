@@ -244,14 +244,13 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
     end;
 
     [Test]
-    [HandlerFunctions('ConfirmHandlerYes')]
+    [HandlerFunctions('ConfirmHandlerYes,MissingForeignFiscalIdentifierErrorMessagesPageHandler')]
     [Scope('OnPrem')]
     procedure SalesInvoice_EnabledValidate_ForeignCustomerWithoutFiscalIdentifier()
     var
         SalesHeader: Record "Sales Header";
         Customer: Record Customer;
         CountryRegion: Record "Country/Region";
-        DummyErrorMessage: Record "Error Message";
     begin
         // [FEATURE] [Sales] [Invoice] [FatturaPA]
         // [SCENARIO] Posting validation rejects a foreign customer without any fiscal identifier
@@ -271,14 +270,13 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
         Customer.Modify(true);
         CreateSalesDocument(SalesHeader, SalesHeader."Document Type"::Invoice, Customer."No.", CreatePaymentMethod());
 
-        // [WHEN] Post the document
-        LibraryErrorMessage.TrapErrorMessages();
-        PostSalesInvoiceUI(SalesHeader);
+        // [WHEN] Posting the invoice without either foreign fiscal identifier
+        asserterror PostSalesInvoiceUI(SalesHeader);
 
-        // [THEN] The missing foreign fiscal identifier is reported before posting
-        LibraryErrorMessage.LoadErrorMessages();
-        LibraryErrorMessage.AssertLogIfMessageExists(
-          Customer, Customer.FieldNo("Fiscal Code"), DummyErrorMessage."Message Type"::Error);
+        // [THEN] The FatturaPA-specific error-page handler verifies the missing-identifier message
+        // and the posting transaction is rolled back.
+        Assert.ExpectedError('');
+        Assert.ExpectedErrorCode('Dialog');
     end;
 
     [Test]
@@ -1179,6 +1177,21 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
         LibraryErrorMessage.LoadErrorMessages();
         LibraryErrorMessage.AssertLogIfMessageExists(
           RecordVariant, DummySalesHeader.FieldNo("Payment Method Code"), DummyErrorMessage."Message Type"::Error);
+    end;
+
+    [PageHandler]
+    [Scope('OnPrem')]
+    procedure MissingForeignFiscalIdentifierErrorMessagesPageHandler(var ErrorMessages: TestPage "Error Messages")
+    var
+        MissingIdentifierErrorFound: Boolean;
+    begin
+        if ErrorMessages.First() then
+            repeat
+                if StrPos(ErrorMessages.Description.Value, 'A foreign customer must have either VAT Registration No. or Fiscal Code') > 0 then
+                    MissingIdentifierErrorFound := true;
+            until not ErrorMessages.Next();
+
+        Assert.IsTrue(MissingIdentifierErrorFound, 'The FatturaPA missing foreign fiscal identifier diagnostic was not shown.');
     end;
 
     [PageHandler]
