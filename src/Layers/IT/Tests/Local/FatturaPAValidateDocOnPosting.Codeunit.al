@@ -666,6 +666,82 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
     end;
 
     [Test]
+    [HandlerFunctions('MissingServicePaymentMethodErrorMessagesPageHandler')]
+    [Scope('OnPrem')]
+    procedure ServiceInvoice_EnabledValidate_RejectsMissingPaymentMethod()
+    var
+        ServiceHeader: Record "Service Header";
+    begin
+        // [FEATURE] [Service] [Invoice] [FatturaPA]
+        // [SCENARIO] The invoice posting flag is not initialized yet when FatturaPA validation runs
+        Initialize();
+        LibraryITLocalization.SetValidateDocumentOnPostingService(true, FatturaPATxt);
+        CreateServiceDocument(ServiceHeader, ServiceHeader."Document Type"::Invoice, CreateCustomerNo('1234567'), '');
+
+        // [WHEN] A standalone service invoice is posted without a payment method
+        asserterror LibraryService.PostServiceOrder(ServiceHeader, true, false, true);
+
+        // [THEN] FatturaPA rejects posting and displays the payment-method diagnostic
+        Assert.ExpectedError('');
+        Assert.ExpectedErrorCode('Dialog');
+    end;
+
+    [Test]
+    [HandlerFunctions('MissingServicePaymentMethodErrorMessagesPageHandler')]
+    [Scope('OnPrem')]
+    procedure ServiceCrMemo_EnabledValidate_RejectsMissingPaymentMethod()
+    var
+        ServiceHeader: Record "Service Header";
+    begin
+        // [FEATURE] [Service] [Credit Memo] [FatturaPA]
+        // [SCENARIO] Standalone credit memos must be validated before posting
+        Initialize();
+        LibraryITLocalization.SetValidateDocumentOnPostingService(true, FatturaPATxt);
+        CreateServiceDocument(ServiceHeader, ServiceHeader."Document Type"::"Credit Memo", CreateCustomerNo('1234567'), '');
+
+        // [WHEN] A standalone service credit memo is posted without a payment method
+        asserterror LibraryService.PostServiceOrder(ServiceHeader, true, false, true);
+
+        // [THEN] FatturaPA rejects posting and displays the payment-method diagnostic
+        Assert.ExpectedError('');
+        Assert.ExpectedErrorCode('Dialog');
+    end;
+
+    [Test]
+    [HandlerFunctions('MissingServicePaymentMethodErrorMessagesPageHandler')]
+    [Scope('OnPrem')]
+    procedure ServiceOrder_EnabledValidate_InvoiceRejectsMissingPaymentMethod()
+    var
+        ServiceHeader: Record "Service Header";
+        ServiceItem: Record "Service Item";
+        ServiceItemLine: Record "Service Item Line";
+        ServiceLine: Record "Service Line";
+    begin
+        // [FEATURE] [Service] [Order] [Invoice] [FatturaPA]
+        // [SCENARIO] Order invoicing is validated, unlike shipment-only posting
+        Initialize();
+        LibraryITLocalization.SetValidateDocumentOnPostingService(true, FatturaPATxt);
+        LibraryService.CreateServiceHeader(
+          ServiceHeader, ServiceHeader."Document Type"::Order, CreateCustomerNo('1234567'));
+        ServiceHeader.Validate("Payment Method Code", '');
+        ServiceHeader.Validate("Payment Terms Code", CreatePaymentTerms());
+        ServiceHeader.Modify(true);
+        LibraryService.CreateServiceItem(ServiceItem, ServiceHeader."Customer No.");
+        LibraryService.CreateServiceItemLine(ServiceItemLine, ServiceHeader, ServiceItem."No.");
+        LibraryService.CreateServiceLineWithQuantity(
+          ServiceLine, ServiceHeader, ServiceLine.Type::Item, LibraryInventory.CreateItemNo(), 1);
+        ServiceLine.Validate("Service Item Line No.", ServiceItemLine."Line No.");
+        ServiceLine.Modify(true);
+
+        // [WHEN] Service order invoice posting is requested with blank payment method
+        asserterror LibraryService.PostServiceOrder(ServiceHeader, true, false, true);
+
+        // [THEN] The invoice is rejected by FatturaPA validation
+        Assert.ExpectedError('');
+        Assert.ExpectedErrorCode('Dialog');
+    end;
+
+    [Test]
     [Scope('OnPrem')]
     procedure ServiceInvoice_EnabledValidate_TypedPACode_TypedPmtMethod()
     var
@@ -1103,6 +1179,22 @@ codeunit 144201 "FatturaPA ValidateDocOnPosting"
         LibraryErrorMessage.LoadErrorMessages();
         LibraryErrorMessage.AssertLogIfMessageExists(
           RecordVariant, DummySalesHeader.FieldNo("Payment Method Code"), DummyErrorMessage."Message Type"::Error);
+    end;
+
+    [PageHandler]
+    [Scope('OnPrem')]
+    procedure MissingServicePaymentMethodErrorMessagesPageHandler(var ErrorMessages: TestPage "Error Messages")
+    var
+        ServiceHeader: Record "Service Header";
+        PaymentMethodErrorFound: Boolean;
+    begin
+        if ErrorMessages.First() then
+            repeat
+                if StrPos(ErrorMessages.Description.Value, ServiceHeader.FieldCaption("Payment Method Code")) > 0 then
+                    PaymentMethodErrorFound := true;
+            until not ErrorMessages.Next();
+
+        Assert.IsTrue(PaymentMethodErrorFound, 'The FatturaPA payment-method validation message was not shown.');
     end;
 
     [ConfirmHandler]
