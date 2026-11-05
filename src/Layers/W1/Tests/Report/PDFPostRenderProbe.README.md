@@ -1,41 +1,12 @@
-# BCApps #11015 — PDF final-artifact probe
+# BCApps #11015 PDF post-render diagnostic, round two
 
-Test-only proof of the interaction between report `OnPreRendering` / `additionalDocuments`,
-`ReportManagement.OnAfterDocumentReady`, and the PDF returned by `Report.SaveAs`.
+Run all four tests in codeunit 139598.
 
-Objects (Tests-Report, W1):
-- Report **139597 PDF Post-Render Probe**, with a minimal RDLC layout.
-- Test codeunit **139598 PDF Post-Render Probe Test**.
+1. `AppendixReachesFinalPdfWithoutSubscriber` confirms an appendix is appended by the platform without any subscriber.
+2. `DocumentReadyPassivelyObservesPreAppendPdf` captures the event PDF but leaves `Success` and `TargetStream` unchanged, and checks the returned PDF contains the appendix.
+3. `DocumentReadyReplacementIsReturnedAfterAppend` replaces the event PDF with a baseline; checks whether appending still occurs after replacement.
+4. `DocumentReadyReplacementWithoutAppend` replaces a report with a distinct PDF without any appendix, checking byte-for-byte equality.
 
-Run **both** test methods in codeunit 139598:
+The original run had event page count 1 versus expected final 2, but its subscriber always set `Success := true`, even for observation. These tests separate those behaviors and make the output observable.
 
-1. `CompletedPdfIncludesAppendixBeforeDocumentReady`
-2. `DocumentReadyReplacementIsReturnedAfterAppend`
-
-The probe's Integer filter controls its behavior: **2** produces a baseline PDF;
-**1** produces the same report with a separately rendered customer-report PDF
-appended from `OnPreRendering`. The test creates a customer, renders the actual
-appendix separately to count its pages, and computes its expected page count as
-baseline + appendix. It captures the completed-event PDF, records its SHA-256
-hash, and compares the returned `Report.SaveAs` bytes. The second test
-replaces the event's combined PDF with a known baseline PDF and confirms that
-the returned bytes match that replacement exactly.
-
-The subscriber is bound manually and filters by the dedicated probe report ID;
-it does not modify production reports. No production source is changed.
-
-Interpretation:
-- A matching page count at `OnAfterDocumentReady` establishes that appended
-  pages were already present in the artifact presented to this event.
-- Exact SHA-256 parity between event bytes and returned PDF rules out
-  downstream byte changes for this tested `Report.SaveAs` route.
-- Exact parity with a *different* replacement PDF demonstrates that
-  `TargetStream` + `Success := true` is honored for this route.
-
-Limitations:
-- These tests cover the stream-based `Report.SaveAs` route only, not user-
-  initiated downloads, printing, email, or `Report Selections` attachment flows.
-- They do not establish an unconditional platform contract for all rendering
-  formats, platform versions, or additional post-processing features.
-- Test results require an AL compile/run on a configured Business Central test
-  installation; the GitHub source commit alone is not execution evidence.
+Only the test codeunit and this README are changed. The test does not establish email, print or archive behavior.

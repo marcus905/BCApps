@@ -26,7 +26,22 @@ codeunit 139598 "PDF Post-Render Probe Test"
         EventDocumentType: Text;
 
     [Test]
-    procedure CompletedPdfIncludesAppendixBeforeDocumentReady()
+    procedure AppendixReachesFinalPdfWithoutSubscriber()
+    var
+        BaselinePdf: Codeunit "Temp Blob";
+        OutputPdf: Codeunit "Temp Blob";
+        ExpectedPageCount: Integer;
+    begin
+        EnsureCustomer();
+        SaveProbe(2, BaselinePdf);
+        ExpectedPageCount := PageCount(BaselinePdf) + RenderAppendixPageCount();
+        SaveProbe(1, OutputPdf);
+        Assert.AreEqual(ExpectedPageCount, PageCount(OutputPdf),
+            'Appendix missing from unmodified PDF output.');
+    end;
+
+    [Test]
+    procedure DocumentReadyPassivelyObservesPreAppendPdf()
     var
         BaselinePdf: Codeunit "Temp Blob";
         OutputPdf: Codeunit "Temp Blob";
@@ -45,9 +60,9 @@ codeunit 139598 "PDF Post-Render Probe Test"
 
         Assert.IsTrue(EventSeen, 'OnAfterDocumentReady was not raised for the probe report.');
         Assert.AreEqual('application/pdf', EventDocumentType, 'The event must expose a PDF.');
-        Assert.AreEqual(ExpectedPageCount, EventPageCount, 'OnAfterDocumentReady did not see the combined PDF.');
-        Assert.AreEqual(ExpectedPageCount, PageCount(OutputPdf), 'Report.SaveAs did not return all appended pages.');
-        Assert.AreEqual(EventHash, ContentHash(OutputPdf), 'PDF bytes changed after OnAfterDocumentReady.');
+        Assert.AreEqual(ExpectedPageCount, PageCount(OutputPdf), 'Final PDF does not include the appendix.');
+        Assert.AreEqual(PageCount(BaselinePdf), EventPageCount, 'Event did not observe the pre-append PDF.');
+        Assert.IsTrue(EventHash <> ContentHash(OutputPdf), 'Post-event PDF bytes did not change.');
     end;
 
     [Test]
@@ -79,9 +94,40 @@ codeunit 139598 "PDF Post-Render Probe Test"
 
         Assert.IsTrue(EventSeen, 'OnAfterDocumentReady was not raised for the probe report.');
         Assert.AreEqual('application/pdf', EventDocumentType, 'The event must expose a PDF.');
-        Assert.AreEqual(ExpectedCombinedPages, EventPageCount, 'The event did not receive the appended PDF before replacement.');
-        Assert.AreEqual(BaselinePageCount, PageCount(OutputPdf), 'The replacement PDF did not reach the final output.');
+        Assert.AreEqual(BaselinePageCount, EventPageCount, 'Event did not observe the pre-append PDF.');
+        Assert.AreEqual(BaselinePageCount, PageCount(OutputPdf),
+            'Replacement did not bypass append processing (post-event changes remain).');
         Assert.AreEqual(ContentHash(BaselinePdf), ContentHash(OutputPdf), 'Report.SaveAs did not return the exact replacement PDF bytes.');
+    end;
+
+    [Test]
+    procedure DocumentReadyReplacementWithoutAppend()
+    var
+        OutputPdf: Codeunit "Temp Blob";
+        ReplacementOut: OutStream;
+        Customer: Record Customer;
+        CustomerRef: RecordRef;
+    begin
+        EnsureCustomer();
+        Customer.FindFirst();
+        Customer.SetRecFilter();
+        CustomerRef.GetTable(Customer);
+        Clear(ReplacementPdf);
+        ReplacementPdf.CreateOutStream(ReplacementOut);
+        if not Report.SaveAs(Report::"Test Report - Default=RDLC", '', ReportFormat::Pdf, ReplacementOut, CustomerRef) then
+            Error('Failed to render the replacement fixture.');
+
+        StartCapture(true);
+        BindSubscription(this);
+        SaveProbe(2, OutputPdf);
+        UnbindSubscription(this);
+        StopCapture();
+
+        Assert.IsTrue(EventSeen, 'OnAfterDocumentReady did not fire.');
+        Assert.AreEqual('application/pdf', EventDocumentType, 'Unexpected document type.');
+        Assert.AreEqual(1, EventPageCount, 'Unexpected original page count.');
+        Assert.AreEqual(ContentHash(ReplacementPdf), ContentHash(OutputPdf),
+            'The platform did not return the exact replacement PDF.');
     end;
 
     local procedure EnsureCustomer()
@@ -177,11 +223,13 @@ codeunit 139598 "PDF Post-Render Probe Test"
         EventPageCount := PageCount(ObservedPdf);
         EventHash := ContentHash(ObservedPdf);
         EventSeen := true;
+        SharedIn.ResetPosition();
 
-        if ReplacePdf then
-            ReplacementPdf.CreateInStream(CopyIn)
-        else
-            ObservedPdf.CreateInStream(CopyIn);
+        // Passive observation must not change the document or return status.
+        if not ReplacePdf then
+            exit;
+
+        ReplacementPdf.CreateInStream(CopyIn);
         CopyStream(TargetStream, CopyIn);
         Success := true;
     end;
