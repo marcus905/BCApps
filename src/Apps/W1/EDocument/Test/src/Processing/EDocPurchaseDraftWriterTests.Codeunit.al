@@ -8,7 +8,7 @@ using Microsoft.eServices.EDocument;
 using Microsoft.eServices.EDocument.Processing.Import;
 using Microsoft.eServices.EDocument.Processing.Import.Purchase;
 
-codeunit 139878 "E-Doc Purchase Draft Writer Test"
+codeunit 139878 "E-Doc Purch Draft Writer Tests"
 {
     Subtype = Test;
     TestType = IntegrationTest;
