@@ -178,45 +178,70 @@ codeunit 139878 "E-Doc Purchase Draft Writer Test"
     end;
 
     [Test]
-    procedure RejectsProcessedEDocumentWithoutOverwritingDraft()
+    procedure AcceptsFilteredTemporaryLineBufferLikeInternalUtility()
     var
         EDocument: Record "E-Document";
         TempHeader: Record "E-Document Purchase Header" temporary;
         TempLines: Record "E-Document Purchase Line" temporary;
-        SavedHeader: Record "E-Document Purchase Header";
+        SavedLines: Record "E-Document Purchase Line";
     begin
         CreateEDocument(EDocument);
-        TempHeader."Vendor Company Name" := 'Original draft';
-        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-        EDocument.Status := EDocument.Status::Processed;
-        EDocument.Modify();
+        TempHeader."Vendor Company Name" := 'Filtered importer';
+        AddTempLine(TempLines, 10000, 'Excluded line');
+        AddTempLine(TempLines, 20000, 'Included line');
+        TempLines.SetRange("Line No.", 20000);
 
-        TempHeader."Vendor Company Name" := 'Must not replace';
-        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-        Assert.ExpectedError('processed or linked E-Document');
-        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Original draft must remain.');
-        Assert.AreEqual('Original draft', SavedHeader."Vendor Company Name", 'Processed document draft must not be overwritten.');
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        SavedLines.SetRange("E-Document Entry No.", EDocument."Entry No");
+        Assert.AreEqual(1, SavedLines.Count(), 'Only the visible temporary lines must be persisted.');
+        Assert.IsTrue(SavedLines.FindFirst(), 'The selected line must be persisted.');
+        Assert.AreEqual('Included line', SavedLines.Description, 'Filtered record selection must match the internal utility.');
+        Assert.AreEqual(10000, SavedLines."Line No.", 'Persisted line numbering must be regenerated.');
     end;
 
     [Test]
-    procedure RejectsFilteredLinesWithoutOverwritingDraft()
+    procedure ReplacesEditedDraftWithoutChangingProcessingStatus()
     var
         EDocument: Record "E-Document";
         TempHeader: Record "E-Document Purchase Header" temporary;
         TempLines: Record "E-Document Purchase Line" temporary;
         SavedHeader: Record "E-Document Purchase Header";
+        SavedLines: Record "E-Document Purchase Line";
+        EDocumentServiceStatus: Record "E-Document Service Status";
     begin
         CreateEDocument(EDocument);
-        TempHeader."Vendor Company Name" := 'Original draft';
-        AddTempLine(TempLines, 10000, 'Original line');
+        EDocumentServiceStatus.Init();
+        EDocumentServiceStatus."E-Document Entry No" := EDocument."Entry No";
+        EDocumentServiceStatus."Import Processing Status" := Enum::"Import E-Doc. Proc. Status"::"Draft Ready";
+        EDocumentServiceStatus.Insert();
+
+        TempHeader."Vendor Company Name" := 'Original parsed header';
+        AddTempLine(TempLines, 10000, 'Original parsed line');
         EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
-        TempHeader."Vendor Company Name" := 'Must not replace';
-        TempLines.SetRange("Line No.", 20000);
-        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-        Assert.ExpectedError('must be unfiltered');
-        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Original draft must remain.');
-        Assert.AreEqual('Original draft', SavedHeader."Vendor Company Name", 'Filtered buffer must not overwrite existing draft.');
+        SavedHeader.Get(EDocument."Entry No");
+        SavedHeader."Vendor Company Name" := 'Manually edited header';
+        SavedHeader.Modify();
+        SavedLines.Get(EDocument."Entry No", 10000);
+        SavedLines.Description := 'Manually edited line';
+        SavedLines.Modify();
+
+        TempHeader := SavedHeader;
+        TempLines.DeleteAll();
+        TempLines.Init();
+        TempLines."E-Document Entry No." := SavedLines."E-Document Entry No.";
+        TempLines."Line No." := SavedLines."Line No.";
+        TempLines.Description := SavedLines.Description;
+        TempLines.Insert();
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        SavedHeader.Get(EDocument."Entry No");
+        SavedLines.Get(EDocument."Entry No", 10000);
+        Assert.AreEqual('Manually edited header', SavedHeader."Vendor Company Name", 'Header edits should survive replacement when included in the buffer.');
+        Assert.AreEqual('Manually edited line', SavedLines.Description, 'Line edits should survive replacement when included in the buffer.');
+        EDocumentServiceStatus.Get(EDocumentServiceStatus."E-Document Entry No", EDocumentServiceStatus."E-Document Service Code");
+        Assert.AreEqual(Enum::"Import E-Doc. Proc. Status"::"Draft Ready", EDocumentServiceStatus."Import Processing Status", 'Persisting a draft must not itself change the import status.');
     end;
 
     [Test]
