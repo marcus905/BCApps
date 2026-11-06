@@ -148,6 +148,100 @@ codeunit 139878 "E-Doc Purchase Draft Writer Test"
         Assert.AreEqual('Unchanged line', TempLines.Description, 'Input line must remain intact.');
     end;
 
+    [Test]
+    procedure RejectsMissingEDocumentWithoutWritingDraft()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+    begin
+        EDocument."Entry No" := 0;
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+        Assert.ExpectedError('The E-Document must exist');
+    end;
+
+    [Test]
+    procedure RejectsOutboundEDocumentWithoutWritingDraft()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+        SavedHeader: Record "E-Document Purchase Header";
+    begin
+        EDocument.Init();
+        EDocument.Direction := EDocument.Direction::Outgoing;
+        EDocument.Insert(true);
+
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+        Assert.ExpectedError('requires an incoming E-Document');
+        Assert.IsFalse(SavedHeader.Get(EDocument."Entry No"), 'No purchase draft must be written.');
+    end;
+
+    [Test]
+    procedure RejectsProcessedEDocumentWithoutOverwritingDraft()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+        SavedHeader: Record "E-Document Purchase Header";
+    begin
+        CreateEDocument(EDocument);
+        TempHeader."Vendor Company Name" := 'Original draft';
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocument.Status := EDocument.Status::Processed;
+        EDocument.Modify();
+
+        TempHeader."Vendor Company Name" := 'Must not replace';
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+        Assert.ExpectedError('processed or linked E-Document');
+        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Original draft must remain.');
+        Assert.AreEqual('Original draft', SavedHeader."Vendor Company Name", 'Processed document draft must not be overwritten.');
+    end;
+
+    [Test]
+    procedure RejectsFilteredLinesWithoutOverwritingDraft()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+        SavedHeader: Record "E-Document Purchase Header";
+    begin
+        CreateEDocument(EDocument);
+        TempHeader."Vendor Company Name" := 'Original draft';
+        AddTempLine(TempLines, 10000, 'Original line');
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        TempHeader."Vendor Company Name" := 'Must not replace';
+        TempLines.SetRange("Line No.", 20000);
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+        Assert.ExpectedError('must be unfiltered');
+        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Original draft must remain.');
+        Assert.AreEqual('Original draft', SavedHeader."Vendor Company Name", 'Filtered buffer must not overwrite existing draft.');
+    end;
+
+    [Test]
+    procedure AllowsReplacementOfPreparedButUnprocessedDraft()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+        SavedHeader: Record "E-Document Purchase Header";
+        EDocumentServiceStatus: Record "E-Document Service Status";
+    begin
+        CreateEDocument(EDocument);
+        EDocumentServiceStatus.Init();
+        EDocumentServiceStatus."E-Document Entry No" := EDocument."Entry No";
+        EDocumentServiceStatus."E-Document Service Code" := '';
+        EDocumentServiceStatus."Import Processing Status" := Enum::"Import E-Doc. Proc. Status"::"Draft Ready";
+        EDocumentServiceStatus.Insert();
+
+        TempHeader."Vendor Company Name" := 'Replacement draft';
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Replacement draft header must exist.');
+        Assert.AreEqual('Replacement draft', SavedHeader."Vendor Company Name", 'Unprocessed draft can be replaced.');
+    end;
+
     local procedure CreateEDocument(var EDocument: Record "E-Document")
     begin
         EDocument.Init();
