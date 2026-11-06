@@ -78,6 +78,31 @@ codeunit 139878 "E-Doc Purch Draft Writer Tests"
     end;
 
     [Test]
+    procedure PersistsPurchaseCreditMemoUsingSameDraftContract()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+        SavedHeader: Record "E-Document Purchase Header";
+        SavedLine: Record "E-Document Purchase Line";
+    begin
+        CreateEDocument(EDocument);
+        EDocument."Document Type" := Enum::"E-Document Type"::"Purchase Credit Memo";
+        EDocument.Modify();
+        TempHeader."Sales Invoice No." := 'CREDIT-100';
+        AddTempLine(TempLines, 10000, 'Credit memo line');
+
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Credit memo staging header must be persisted.');
+        Assert.AreEqual('CREDIT-100', SavedHeader."Sales Invoice No.", 'Credit memo header data must be preserved.');
+        Assert.IsTrue(SavedLine.Get(EDocument."Entry No", 10000), 'Credit memo staging line must be persisted.');
+        Assert.AreEqual('Credit memo line', SavedLine.Description, 'Credit memo line data must be preserved.');
+        EDocument.Get(EDocument."Entry No");
+        Assert.AreEqual(Enum::"E-Document Type"::"Purchase Credit Memo", EDocument."Document Type", 'PersistDraft must not change the E-Document type.');
+    end;
+
+    [Test]
     procedure EmptyLineBufferRemovesPreviousLines()
     var
         EDocument: Record "E-Document";
