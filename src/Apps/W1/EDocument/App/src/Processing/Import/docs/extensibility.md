@@ -32,7 +32,7 @@ Country apps follow the same pattern. XRechnung and OIOUBL extend `E-Doc. Read i
 
 ## Persist a purchase draft from an external reader
 
-A purchase `IStructuredFormatReader` implementation can parse its source data into temporary `E-Document Purchase Header` and `E-Document Purchase Line` records and use public codeunit `E-Doc. Purchase Draft Utility` to persist the standard draft. This is the supported persistence entry point; the the same utility is used by the first-party readers.
+A purchase `IStructuredFormatReader` implementation can parse its source data into temporary `E-Document Purchase Header` and `E-Document Purchase Line` records and use public codeunit `E-Doc. Purchase Draft Utility` to persist the standard draft. This is the supported persistence entry point; the same utility is used by the first-party readers.
 
 ```al
 var
