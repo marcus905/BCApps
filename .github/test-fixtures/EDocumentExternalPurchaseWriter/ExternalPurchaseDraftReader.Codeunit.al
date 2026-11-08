@@ -19,7 +19,7 @@ codeunit 50100 "External Purchase Draft Reader" implements IStructuredFormatRead
     var
         TempPurchaseHeader: Record "E-Document Purchase Header" temporary;
         TempPurchaseLines: Record "E-Document Purchase Line" temporary;
-        PurchaseDraftWriter: Codeunit "E-Doc. Purchase Draft Utility";
+        PurchaseDraftWriter: Codeunit "E-Doc. Purchase Draft Writer";
     begin
         // A real implementation parses TempBlob before populating these staging buffers.
         TempPurchaseHeader."Vendor Company Name" := 'External Reader Supplier';

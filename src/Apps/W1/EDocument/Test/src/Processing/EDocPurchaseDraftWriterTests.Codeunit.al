@@ -16,7 +16,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
 
     var
         Assert: Codeunit Assert;
-        EDocPurchaseDraftUtility: Codeunit "E-Doc. Purchase Draft Utility";
+        EDocPurchaseDraftWriter: Codeunit "E-Doc. Purchase Draft Writer";
 
     [Test]
     procedure PersistsHeaderAndLinesWithStandardLinkageAndLineNumbers()
@@ -33,7 +33,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         AddTempLine(TempLines, 30000, 'Third line');
         AddTempLine(TempLines, 10000, 'First line');
 
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Purchase draft header was not persisted.');
         Assert.AreEqual('External supplier', SavedHeader."Vendor Company Name", 'Vendor name must be preserved.');
@@ -61,12 +61,12 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         TempHeader."Vendor Company Name" := 'Old supplier';
         AddTempLine(TempLines, 10000, 'Old line');
         AddTempLine(TempLines, 20000, 'Another old line');
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         TempHeader."Vendor Company Name" := 'New supplier';
         TempLines.DeleteAll();
         AddTempLine(TempLines, 50000, 'Replacement line');
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Replacement header must exist.');
         Assert.AreEqual('New supplier', SavedHeader."Vendor Company Name", 'Header must be replaced.');
@@ -92,7 +92,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         TempHeader."Sales Invoice No." := 'CREDIT-100';
         AddTempLine(TempLines, 10000, 'Credit memo line');
 
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Credit memo staging header must be persisted.');
         Assert.AreEqual('CREDIT-100', SavedHeader."Sales Invoice No.", 'Credit memo header data must be preserved.');
@@ -112,10 +112,10 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
     begin
         CreateEDocument(EDocument);
         AddTempLine(TempLines, 10000, 'Previous line');
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         TempLines.DeleteAll();
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         SavedLines.SetRange("E-Document Entry No.", EDocument."Entry No");
         Assert.IsTrue(SavedLines.IsEmpty(), 'An empty buffer must replace, not retain, previous lines.');
@@ -135,12 +135,12 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         CreateEDocument(SecondEDocument);
         TempHeader."Vendor Company Name" := 'First supplier';
         AddTempLine(TempLines, 10000, 'First document line');
-        EDocPurchaseDraftUtility.PersistDraft(FirstEDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(FirstEDocument, TempHeader, TempLines);
 
         TempHeader."Vendor Company Name" := 'Second supplier';
         TempLines.DeleteAll();
         AddTempLine(TempLines, 10000, 'Second document line');
-        EDocPurchaseDraftUtility.PersistDraft(SecondEDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(SecondEDocument, TempHeader, TempLines);
 
         Assert.IsTrue(SavedHeader.Get(FirstEDocument."Entry No"), 'First header must remain.');
         Assert.AreEqual('First supplier', SavedHeader."Vendor Company Name", 'First header must not change.');
@@ -165,7 +165,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         TempHeader."Vendor Company Name" := 'Unchanged supplier';
         AddTempLine(TempLines, 30000, 'Unchanged line');
 
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         Assert.AreEqual(0, TempHeader."E-Document Entry No.", 'Input header linkage must not be overwritten.');
         Assert.AreEqual('Unchanged supplier', TempHeader."Vendor Company Name", 'Input header must remain intact.');
@@ -181,7 +181,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         TempLines: Record "E-Document Purchase Line" temporary;
     begin
         EDocument."Entry No" := 0;
-        asserterror EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
         Assert.ExpectedError('The E-Document must exist');
     end;
 
@@ -197,7 +197,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         EDocument.Direction := EDocument.Direction::Outgoing;
         EDocument.Insert(true);
 
-        asserterror EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
         Assert.ExpectedError('requires an incoming E-Document');
         Assert.IsFalse(SavedHeader.Get(EDocument."Entry No"), 'No purchase draft must be written.');
     end;
@@ -216,7 +216,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         AddTempLine(TempLines, 20000, 'Included line');
         TempLines.SetRange("Line No.", 20000);
 
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         SavedLines.SetRange("E-Document Entry No.", EDocument."Entry No");
         Assert.AreEqual(1, SavedLines.Count(), 'Only the visible temporary lines must be persisted.');
@@ -243,7 +243,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
 
         TempHeader."Vendor Company Name" := 'Original parsed header';
         AddTempLine(TempLines, 10000, 'Original parsed line');
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         SavedHeader.Get(EDocument."Entry No");
         SavedHeader."Vendor Company Name" := 'Manually edited header';
@@ -259,7 +259,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         TempLines."Line No." := SavedLines."Line No.";
         TempLines.Description := SavedLines.Description;
         TempLines.Insert();
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         SavedHeader.Get(EDocument."Entry No");
         SavedLines.Get(EDocument."Entry No", 10000);
@@ -286,7 +286,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         EDocumentServiceStatus.Insert();
 
         TempHeader."Vendor Company Name" := 'Replacement draft';
-        EDocPurchaseDraftUtility.PersistDraft(EDocument, TempHeader, TempLines);
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
         Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Replacement draft header must exist.');
         Assert.AreEqual('Replacement draft', SavedHeader."Vendor Company Name", 'Unprocessed draft can be replaced.');

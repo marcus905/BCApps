@@ -3301,7 +3301,7 @@ codeunit 133508 "E-Doc. PO Matching Unit Tests"
         PurchaseHeader: Record "Purchase Header";
         PurchaseLine: Record "Purchase Line";
         Item: Record Item;
-        EDocPurchaseDraftUtility: Codeunit "E-Doc. Purchase Draft Utility";
+        EDocPurchaseDraftWriter: Codeunit "E-Doc. Purchase Draft Writer";
         PreviousLineSystemId: Guid;
     begin
         Initialize();
