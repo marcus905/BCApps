@@ -365,6 +365,54 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
     end;
 
     [Test]
+    procedure AllowsReplacementAfterStandardLifecycleReset()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+        SavedHeader: Record "E-Document Purchase Header";
+        EDocumentServiceStatus: Record "E-Document Service Status";
+    begin
+        // [SCENARIO] A reverted import can replace an old prepared draft.
+        // [GIVEN] An incoming document whose prepared state was reset to Ready for draft
+        CreateEDocument(EDocument);
+        TempHeader."Vendor Company Name" := 'Original supplier';
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+        SetImportProcessingStatus(EDocument, Enum::"Import E-Doc. Proc. Status"::"Draft ready");
+        SetImportProcessingStatus(EDocument, Enum::"Import E-Doc. Proc. Status"::"Ready for draft");
+        TempHeader."Vendor Company Name" := 'Replacement supplier';
+
+        // [WHEN] The reader re-persists the document after lifecycle reset
+        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        // [THEN] The replacement is allowed without advancing import status
+        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Replacement header must exist.');
+        Assert.AreEqual('Replacement supplier', SavedHeader."Vendor Company Name", 'A reset draft should be replaceable.');
+        EDocumentServiceStatus.Get(EDocument."Entry No", EDocument.Service);
+        Assert.AreEqual(Enum::"Import E-Doc. Proc. Status"::"Ready for draft", EDocumentServiceStatus."Import Processing Status", 'Writer must not change the reset status.');
+    end;
+
+    [Test]
+    procedure RejectsMissingPersistedEDocumentWithNonzeroEntryNo()
+    var
+        EDocument: Record "E-Document";
+        TempHeader: Record "E-Document Purchase Header" temporary;
+        TempLines: Record "E-Document Purchase Line" temporary;
+    begin
+        // [SCENARIO] A record with an assigned but nonexistent entry number cannot write a draft.
+        // [GIVEN] An incoming E-Document with a nonexistent negative entry number
+        EDocument.Init();
+        EDocument."Entry No" := -1;
+        EDocument.Direction := EDocument.Direction::Incoming;
+
+        // [WHEN] The writer tries to persist the missing E-Document
+        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
+
+        // [THEN] The missing record is rejected before any draft is persisted
+        Assert.ExpectedError('The E-Document must exist');
+    end;
+
+    [Test]
     procedure AllowsPersistenceForReadableDocument()
     var
         EDocument: Record "E-Document";
