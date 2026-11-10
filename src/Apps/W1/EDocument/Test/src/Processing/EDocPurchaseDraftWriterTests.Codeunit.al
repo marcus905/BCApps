@@ -309,7 +309,7 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
     end;
 
     [Test]
-    procedure RejectsReplacementOfPreparedDraft()
+    procedure ReplacesPreparedDraftWithoutChangingProcessingStatus()
     var
         EDocument: Record "E-Document";
         TempHeader: Record "E-Document Purchase Header" temporary;
@@ -317,79 +317,22 @@ codeunit 133509 "E-Doc Purch Draft API Tests"
         SavedHeader: Record "E-Document Purchase Header";
         EDocumentServiceStatus: Record "E-Document Service Status";
     begin
-        // [SCENARIO] A prepared purchase draft cannot be silently replaced.
-        // [GIVEN] An incoming document with an existing draft in Draft ready state
+        // [SCENARIO] Low-level draft persistence is status-neutral, like the internal utility.
+        // [GIVEN] An incoming E-Document with a prepared draft and Draft ready status
         CreateEDocument(EDocument);
         TempHeader."Vendor Company Name" := 'Original supplier';
         EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
         SetImportProcessingStatus(EDocument, Enum::"Import E-Doc. Proc. Status"::"Draft ready");
         TempHeader."Vendor Company Name" := 'Replacement supplier';
 
-        // [WHEN] An external reader attempts to replace the prepared draft
-        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-
-        // [THEN] Replacement fails without altering the existing draft or processing status
-        Assert.ExpectedError('already been prepared or finalized');
-        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Original purchase header must still exist.');
-        Assert.AreEqual('Original supplier', SavedHeader."Vendor Company Name", 'Prepared draft must not be replaced.');
-        EDocumentServiceStatus.Get(EDocument."Entry No", EDocument.Service);
-        Assert.AreEqual(Enum::"Import E-Doc. Proc. Status"::"Draft ready", EDocumentServiceStatus."Import Processing Status", 'Prepared status must be preserved.');
-    end;
-
-    [Test]
-    procedure RejectsReplacementOfProcessedDraft()
-    var
-        EDocument: Record "E-Document";
-        TempHeader: Record "E-Document Purchase Header" temporary;
-        TempLines: Record "E-Document Purchase Line" temporary;
-        SavedHeader: Record "E-Document Purchase Header";
-        EDocumentServiceStatus: Record "E-Document Service Status";
-    begin
-        // [SCENARIO] A finalized purchase draft cannot be silently replaced.
-        // [GIVEN] An incoming document with an existing draft in Processed state
-        CreateEDocument(EDocument);
-        TempHeader."Vendor Company Name" := 'Original supplier';
-        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-        SetImportProcessingStatus(EDocument, Enum::"Import E-Doc. Proc. Status"::Processed);
-        TempHeader."Vendor Company Name" := 'Replacement supplier';
-
-        // [WHEN] An external reader attempts to replace the processed draft
-        asserterror EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-
-        // [THEN] Replacement fails without altering the existing draft or processing status
-        Assert.ExpectedError('already been prepared or finalized');
-        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Original purchase header must still exist.');
-        Assert.AreEqual('Original supplier', SavedHeader."Vendor Company Name", 'Processed draft must not be replaced.');
-        EDocumentServiceStatus.Get(EDocument."Entry No", EDocument.Service);
-        Assert.AreEqual(Enum::"Import E-Doc. Proc. Status"::Processed, EDocumentServiceStatus."Import Processing Status", 'Processed status must be preserved.');
-    end;
-
-    [Test]
-    procedure AllowsReplacementAfterStandardLifecycleReset()
-    var
-        EDocument: Record "E-Document";
-        TempHeader: Record "E-Document Purchase Header" temporary;
-        TempLines: Record "E-Document Purchase Line" temporary;
-        SavedHeader: Record "E-Document Purchase Header";
-        EDocumentServiceStatus: Record "E-Document Service Status";
-    begin
-        // [SCENARIO] A reverted import can replace an old prepared draft.
-        // [GIVEN] An incoming document whose prepared state was reset to Ready for draft
-        CreateEDocument(EDocument);
-        TempHeader."Vendor Company Name" := 'Original supplier';
-        EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
-        SetImportProcessingStatus(EDocument, Enum::"Import E-Doc. Proc. Status"::"Draft ready");
-        SetImportProcessingStatus(EDocument, Enum::"Import E-Doc. Proc. Status"::"Ready for draft");
-        TempHeader."Vendor Company Name" := 'Replacement supplier';
-
-        // [WHEN] The reader re-persists the document after lifecycle reset
+        // [WHEN] The draft buffers are persisted through the low-level facade
         EDocPurchaseDraftWriter.PersistDraft(EDocument, TempHeader, TempLines);
 
-        // [THEN] The replacement is allowed without advancing import status
-        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Replacement header must exist.');
-        Assert.AreEqual('Replacement supplier', SavedHeader."Vendor Company Name", 'A reset draft should be replaceable.');
+        // [THEN] The staging data is replaced, while the import status remains untouched
+        Assert.IsTrue(SavedHeader.Get(EDocument."Entry No"), 'Purchase draft header must exist.');
+        Assert.AreEqual('Replacement supplier', SavedHeader."Vendor Company Name", 'Writer must match internal status-neutral draft replacement.');
         EDocumentServiceStatus.Get(EDocument."Entry No", EDocument.Service);
-        Assert.AreEqual(Enum::"Import E-Doc. Proc. Status"::"Ready for draft", EDocumentServiceStatus."Import Processing Status", 'Writer must not change the reset status.');
+        Assert.AreEqual(Enum::"Import E-Doc. Proc. Status"::"Draft ready", EDocumentServiceStatus."Import Processing Status", 'The writer must not modify the import-processing status.');
     end;
 
     [Test]
