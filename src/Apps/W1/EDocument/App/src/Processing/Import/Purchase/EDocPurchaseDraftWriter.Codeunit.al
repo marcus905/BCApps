@@ -22,6 +22,7 @@ codeunit 6540 "E-Doc. Purchase Draft Writer"
     /// The internal draft utility assigns the E-Document linkage and new line numbers.
     /// Only lines visible under the temporary line buffer's current filters are persisted.
     /// The writer does not change import-processing status or run Prepare Draft / Finish Draft.
+    /// Replacement is rejected after draft preparation or finalization; reset through standard import orchestration first.
     /// Any existing draft edits are lost unless they are represented in the supplied buffers.
     /// </summary>
     /// <param name="EDocument">An existing incoming E-Document for which to replace the purchase draft.</param>
@@ -33,12 +34,26 @@ codeunit 6540 "E-Doc. Purchase Draft Writer"
         EDocPurchaseDraftUtility: Codeunit "E-Doc. Purchase Draft Utility";
         InvalidEDocumentErr: Label 'The E-Document must exist before its purchase draft can be persisted.';
         IncomingEDocumentRequiredErr: Label 'Purchase draft persistence requires an incoming E-Document.';
+        PreparedDraftErr: Label 'The purchase draft has already been prepared or finalized. Reset the E-Document import process before replacing it.';
     begin
-        if (EDocument."Entry No" = 0) or (not ExistingEDocument.Get(EDocument."Entry No")) then
+        if EDocument."Entry No" = 0 then
+            Error(InvalidEDocumentErr);
+
+        if EDocument.Direction <> EDocument.Direction::Incoming then
+            Error(IncomingEDocumentRequiredErr);
+
+        if not ExistingEDocument.Get(EDocument."Entry No") then
             Error(InvalidEDocumentErr);
 
         if ExistingEDocument.Direction <> ExistingEDocument.Direction::Incoming then
             Error(IncomingEDocumentRequiredErr);
+
+        ExistingEDocument.CalcFields("Import Processing Status");
+        if ExistingEDocument."Import Processing Status" in [
+            Enum::"Import E-Doc. Proc. Status"::"Draft ready",
+            Enum::"Import E-Doc. Proc. Status"::Processed]
+        then
+            Error(PreparedDraftErr);
 
         EDocPurchaseDraftUtility.PersistDraft(ExistingEDocument, TempEDocPurchaseHeader, TempEDocPurchaseLine);
     end;
