@@ -75,6 +75,9 @@ codeunit 144200 "FatturaPA Test"
         PreviewAccounting: Codeunit "FatturaPA Preview Accounting";
     begin
         // [SCENARIO] Multiple installments aggregate initial entries per ledger entry only.
+        // [GIVEN] several ledger installments with initial and application details
+        // [WHEN] payment rows are aggregated
+        // [THEN] only initial amounts contribute to each installment
         TempCustLedgEntry.Init();
         TempCustLedgEntry."Entry No." := 101;
         TempCustLedgEntry."Due Date" := DMY2Date(15, 1, 2026);
@@ -200,6 +203,9 @@ codeunit 144200 "FatturaPA Test"
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
         // [SCENARIO] Missing preview number is rejected before posting preview or buffer changes.
+        // [GIVEN] an existing invoice and a blank preview transmission number
+        // [WHEN] preview preparation is requested
+        // [THEN] validation rejects the missing progressive number
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -223,6 +229,9 @@ codeunit 144200 "FatturaPA Test"
         CustomerNo: Code[20];
     begin
         // [SCENARIO] Caller-only changes to a sales header must not affect the preview.
+        // [GIVEN] an altered in-memory Sales Header with unsaved changes
+        // [WHEN] preview preparation reloads the persisted document
+        // [THEN] unsaved caller fields do not enter the XML
         Initialize();
         CustomerNo := CreateCustomer();
         CreateSalesDocument(
@@ -257,6 +266,9 @@ codeunit 144200 "FatturaPA Test"
         CustomerNo: Code[20];
     begin
         // [SCENARIO] A temporary record with a real document key cannot override stored fields.
+        // [GIVEN] a temporary caller Sales Header with a persisted document identity
+        // [WHEN] preview preparation resolves the stored source
+        // [THEN] temporary caller values do not override persisted values
         Initialize();
         CustomerNo := CreateCustomer();
         CreateSalesDocument(
@@ -292,6 +304,9 @@ codeunit 144200 "FatturaPA Test"
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
         // [SCENARIO] Caller-provided fields cannot create a preview for a nonexistent document.
+        // [GIVEN] a caller document that does not exist in storage
+        // [WHEN] preview preparation is invoked
+        // [THEN] no document or fiscal data is invented
         SalesHeader.Init();
         SalesHeader."Document Type" := SalesHeader."Document Type"::Invoice;
         SalesHeader."No." := '!MISSING-BCAPPS13014';
@@ -305,7 +320,7 @@ codeunit 144200 "FatturaPA Test"
 
     [Test]
     [TransactionModel(TransactionModel::AutoCommit)]
-    procedure TempPreviewXMLDoesNotAdvanceFatturaPANumberSeries()
+    procedure PreviewXMLDoesNotAdvanceFatturaPANumberSeries()
     var
         SalesHeader: Record "Sales Header";
         FatturaPANoSeries: Record "No. Series Line";
@@ -318,6 +333,10 @@ codeunit 144200 "FatturaPA Test"
         LastNoUsed: Code[20];
         ClientFileName: Text[250];
     begin
+        // [SCENARIO] The genuine number series remains unchanged.
+        // [GIVEN] a valid document and a configured transmission series
+        // [WHEN] preview XML is generated repeatedly
+        // [THEN] the genuine number series remains unchanged
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -346,6 +365,10 @@ codeunit 144200 "FatturaPA Test"
         SalesHeader: Record "Sales Header";
         Customer: Record Customer;
     begin
+        // [SCENARIO] Their significant fiscal values match.
+        // [GIVEN] an invoice that can be previewed and posted
+        // [WHEN] both preview and posted FatturaPA payloads are prepared
+        // [THEN] their significant fiscal values match
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -371,6 +394,10 @@ codeunit 144200 "FatturaPA Test"
     var
         SalesHeader: Record "Sales Header";
     begin
+        // [SCENARIO] Their significant fiscal values match.
+        // [GIVEN] a credit memo that can be previewed and posted
+        // [WHEN] both preview and posted payloads are prepared
+        // [THEN] their significant fiscal values match
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -387,6 +414,10 @@ codeunit 144200 "FatturaPA Test"
         ItemLine: Record "Sales Line";
         CommentLine: Record "Sales Line";
     begin
+        // [SCENARIO] The invoice content and line treatment remain equivalent.
+        // [GIVEN] an invoice with commercial and extended-text lines
+        // [WHEN] preview and posted XML are compared
+        // [THEN] the invoice content and line treatment remain equivalent
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -414,6 +445,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaHeader: Record "Fattura Header" temporary;
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
+        // [SCENARIO] The catalog remains unchanged.
+        // [GIVEN] missing FatturaPA document-type catalog records
+        // [WHEN] the read-only preview document-type resolver runs
+        // [THEN] the catalog remains unchanged
         Initialize();
         Customer.Get(CreateCustomer());
         FatturaDocumentType.DeleteAll(false);
@@ -438,6 +473,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaHeader: Record "Fattura Header" temporary;
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
+        // [SCENARIO] The correct type is returned without modifying setup.
+        // [GIVEN] a configured document-type default
+        // [WHEN] the preview resolver reads the configuration
+        // [THEN] the correct type is returned without modifying setup
         Initialize();
         Customer.Get(CreateCustomer());
         FatturaDocumentType.DeleteAll(false);
@@ -466,6 +505,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaHeader: Record "Fattura Header" temporary;
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
+        // [SCENARIO] Explicit and self-billing rules are honored.
+        // [GIVEN] explicit document-type and self-billing configuration
+        // [WHEN] the preview resolver selects a document type
+        // [THEN] explicit and self-billing rules are honored
         Initialize();
         Customer.Get(CreateCustomer());
         CompanyInformation.Get();
@@ -491,6 +534,10 @@ codeunit 144200 "FatturaPA Test"
         AdditionalVATPostingSetup: Record "VAT Posting Setup";
         VATProductPostingGroup: Record "VAT Product Posting Group";
     begin
+        // [SCENARIO] VAT summary and line amounts remain equivalent.
+        // [GIVEN] an invoice using multiple VAT rates
+        // [WHEN] preview and posted XML are compared
+        // [THEN] VAT summary and line amounts remain equivalent
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -527,6 +574,10 @@ codeunit 144200 "FatturaPA Test"
     var
         SalesHeader: Record "Sales Header";
     begin
+        // [SCENARIO] Split-payment fiscal data remains equivalent.
+        // [GIVEN] an invoice using split payment
+        // [WHEN] preview and posted XML are compared
+        // [THEN] split-payment fiscal data remains equivalent
         Initialize();
         CreateInvoiceWithSplitPayment(SalesHeader);
         Commit();
@@ -540,6 +591,10 @@ codeunit 144200 "FatturaPA Test"
         SalesHeader: Record "Sales Header";
         VATPostingSetup: Record "VAT Posting Setup";
     begin
+        // [SCENARIO] Unrealized-VAT treatment remains equivalent.
+        // [GIVEN] an invoice using unrealized VAT
+        // [WHEN] preview and posted XML are compared
+        // [THEN] unrealized-VAT treatment remains equivalent
         Initialize();
         CreateUnrealizedVATPostingSetup(VATPostingSetup);
         CreateInvoiceWithVATPostingSetup(SalesHeader, VATPostingSetup);
@@ -554,6 +609,10 @@ codeunit 144200 "FatturaPA Test"
         SalesHeader: Record "Sales Header";
         SalesLine: Record "Sales Line";
     begin
+        // [SCENARIO] Only the invoiced amounts and lines are represented.
+        // [GIVEN] a partially invoiceable sales order
+        // [WHEN] preview and posted XML are compared
+        // [THEN] only the invoiced amounts and lines are represented
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -584,6 +643,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
+        // [SCENARIO] Prorated discount amounts and totals match.
+        // [GIVEN] a partial sales-order invoice with discounts
+        // [WHEN] preview and posted XML are compared
+        // [THEN] prorated discount amounts and totals match
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -615,6 +678,10 @@ codeunit 144200 "FatturaPA Test"
     var
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
+        // [SCENARIO] Per-line rounding produces the expected total.
+        // [GIVEN] a non-divisible prorated invoice discount
+        // [WHEN] the currency-rounded allocation is calculated
+        // [THEN] per-line rounding produces the expected total
         Initialize();
         Assert.AreEqual(0.33, FatturaDocHelper.ProrateFatturaInvoiceDiscount(1, 3, 1, 0.01),
             'A one-of-three partial discount must use currency amount rounding.');
@@ -634,6 +701,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
+        // [SCENARIO] The calculated invoice discount is retained.
+        // [GIVEN] a sales invoice with an invoice-discount FlowField
+        // [WHEN] the preview header is built
+        // [THEN] the calculated invoice discount is retained
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -664,6 +735,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
+        // [SCENARIO] The expected metadata appears without invented shipment references.
+        // [GIVEN] an order with customer PO and CUP/CIG references
+        // [WHEN] the preview lines are generated
+        // [THEN] the expected metadata appears without invented shipment references
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -694,6 +769,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaHeader: Record "Fattura Header" temporary;
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
     begin
+        // [SCENARIO] The VAT-entry representative information is preserved.
+        // [GIVEN] tax representative information on a temporary VAT entry
+        // [WHEN] preview tax representative fields are populated
+        // [THEN] the VAT-entry representative information is preserved
         Initialize();
         TempVATEntry.Init();
         TempVATEntry."Entry No." := 1;
@@ -723,6 +802,10 @@ codeunit 144200 "FatturaPA Test"
         CommercialLineCount: Integer;
         ReferenceCount: Integer;
     begin
+        // [SCENARIO] DDT references and commercial lines agree.
+        // [GIVEN] a direct invoice populated using Get Shipment Lines
+        // [WHEN] preview and posted exports are generated
+        // [THEN] DDT references and commercial lines agree
         Initialize();
         CustomerNo := CreateCustomer();
         CreateAndPostSalesOrderAsShipment(CustomerNo, 1);
@@ -762,6 +845,10 @@ codeunit 144200 "FatturaPA Test"
     var
         SalesHeader: Record "Sales Header";
     begin
+        // [SCENARIO] Purchase-order references match.
+        // [GIVEN] an invoice with a customer purchase-order reference
+        // [WHEN] preview and posted exports are compared
+        // [THEN] purchase-order references match
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -781,6 +868,10 @@ codeunit 144200 "FatturaPA Test"
         SalesLine: Record "Sales Line";
         SalesShipmentLine: Record "Sales Shipment Line";
     begin
+        // [SCENARIO] Existing shipment references remain consistent.
+        // [GIVEN] an order with previously posted shipments
+        // [WHEN] preview and posted XML are generated
+        // [THEN] existing shipment references remain consistent
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -831,6 +922,10 @@ codeunit 144200 "FatturaPA Test"
         FirstShipmentNo: Code[20];
         SecondShipmentNo: Code[20];
     begin
+        // [SCENARIO] The correct uninvoiced shipment is selected.
+        // [GIVEN] multiple shipments where a later shipment was invoiced first
+        // [WHEN] the remaining sales-order quantity is previewed
+        // [THEN] the correct uninvoiced shipment is selected
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -949,6 +1044,10 @@ codeunit 144200 "FatturaPA Test"
         UndoneShipmentNo: Code[20];
         ReplacementShipmentNo: Code[20];
     begin
+        // [SCENARIO] The original corrected shipment is excluded.
+        // [GIVEN] a shipment undone and replaced
+        // [WHEN] the order preview is prepared
+        // [THEN] the original corrected shipment is excluded
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -1030,6 +1129,10 @@ codeunit 144200 "FatturaPA Test"
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
         FirstShipmentNo: Code[20];
     begin
+        // [SCENARIO] Both DDT references map to the correct commercial line.
+        // [GIVEN] an invoice line sourced from two shipments
+        // [WHEN] preview and posted XML are compared
+        // [THEN] both DDT references map to the correct commercial line
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -1099,6 +1202,10 @@ codeunit 144200 "FatturaPA Test"
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
         LibraryInventory: Codeunit "Library - Inventory";
     begin
+        // [SCENARIO] Shipment references retain their line associations.
+        // [GIVEN] an invoice containing two separate shipment-linked lines
+        // [WHEN] preview and posted XML are compared
+        // [THEN] shipment references retain their line associations
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -1158,6 +1265,10 @@ codeunit 144200 "FatturaPA Test"
         ClientFileName: Text[250];
         PostedInvoiceNo: Code[20];
     begin
+        // [SCENARIO] The known invoice application is emitted.
+        // [GIVEN] a credit memo with an applied posted invoice
+        // [WHEN] preview fiscal references are populated
+        // [THEN] the known invoice application is emitted
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -1202,6 +1313,10 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
     begin
+        // [SCENARIO] No invented applied-invoice reference appears.
+        // [GIVEN] a credit memo without an applied invoice
+        // [WHEN] preview fiscal references are populated
+        // [THEN] no invented applied-invoice reference appears
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -1226,6 +1341,10 @@ codeunit 144200 "FatturaPA Test"
         OldShipmentNo: Code[20];
         PendingShipmentNo: Code[20];
     begin
+        // [SCENARIO] Fully invoiced historical DDTs are omitted.
+        // [GIVEN] an order with both invoiced and uninvoiced shipments
+        // [WHEN] the next invoice is previewed
+        // [THEN] fully invoiced historical DDTs are omitted
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
@@ -1458,6 +1577,9 @@ codeunit 144200 "FatturaPA Test"
         ClientFileName: Text[250];
     begin
         // [SCENARIO] An unposted invoice can be prepared and serialized without
+        // [GIVEN] a valid unposted invoice
+        // [WHEN] the standard FatturaPA preview API serializes XML
+        // [THEN] the resulting preview matches required invoice content
         // allocating the real FatturaPA progressive number.
         Initialize();
         CreateSalesDocument(
@@ -1485,11 +1607,15 @@ codeunit 144200 "FatturaPA Test"
     var
         SalesHeader: Record "Sales Header";
     begin
+        // [SCENARIO] The resulting preview matches required credit-memo content.
+        // [GIVEN] a valid unposted credit memo
+        // [WHEN] the standard FatturaPA preview API serializes XML
+        // [THEN] the resulting preview matches required credit-memo content
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
         Commit(); // Make test document visible to posting preview.
-        VerifyPreparedTempPreviewXML(SalesHeader, 'TD04');
+        VerifyPreparedPreviewXML(SalesHeader, 'TD04');
     end;
 
     [Test]
@@ -1498,14 +1624,18 @@ codeunit 144200 "FatturaPA Test"
     var
         SalesHeader: Record "Sales Header";
     begin
+        // [SCENARIO] The resulting preview matches required order content.
+        // [GIVEN] a valid unposted sales order
+        // [WHEN] the standard FatturaPA preview API serializes XML
+        // [THEN] the resulting preview matches required order content
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Order);
         Commit(); // Make test document visible to posting preview.
-        VerifyPreparedTempPreviewXML(SalesHeader, 'TD01');
+        VerifyPreparedPreviewXML(SalesHeader, 'TD01');
     end;
 
-    local procedure VerifyPreparedTempPreviewXML(SalesHeader: Record "Sales Header"; ExpectedFatturaDocumentType: Text)
+    local procedure VerifyPreparedPreviewXML(SalesHeader: Record "Sales Header"; ExpectedFatturaDocumentType: Text)
     var
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
@@ -1543,6 +1673,10 @@ codeunit 144200 "FatturaPA Test"
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
         OriginalLastNoUsed: Code[20];
     begin
+        // [SCENARIO] The actual transmission series is not consumed.
+        // [GIVEN] a valid document and a configured FatturaPA series
+        // [WHEN] the preview buffers are prepared
+        // [THEN] the actual transmission series is not consumed
         Initialize();
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Invoice);
