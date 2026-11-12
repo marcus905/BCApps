@@ -123,6 +123,75 @@ codeunit 144200 "FatturaPA Test"
     end;
 
     [Test]
+    procedure PreviewPaymentRowsRejectMissingInitialEntry()
+    var
+        TempCustLedgEntry: Record "Cust. Ledger Entry" temporary;
+        TempDtldCustLedgEntry: Record "Detailed Cust. Ledg. Entry" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        PreviewAccounting: Codeunit "FatturaPA Preview Accounting";
+    begin
+        // [SCENARIO] Preview must not invent a zero payment when initial ledger data is absent.
+        // [GIVEN] A customer ledger entry without a matching initial detailed ledger entry
+        TempCustLedgEntry.Init();
+        TempCustLedgEntry."Entry No." := 101;
+        TempCustLedgEntry.Insert();
+
+        // [WHEN] Payment rows are prepared from incomplete posting-preview buffers
+        asserterror PreviewAccounting.AddPaymentRows(TempFatturaLine, TempCustLedgEntry, TempDtldCustLedgEntry);
+
+        // [THEN] The missing source is reported and no zero-valued payment is emitted
+        Assert.ExpectedError('initial detailed customer ledger entry');
+        Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Missing source entry must not produce payment rows.');
+    end;
+
+    [Test]
+    procedure PreviewPaymentRowsPreserveActualZeroInitialEntry()
+    var
+        TempCustLedgEntry: Record "Cust. Ledger Entry" temporary;
+        TempDtldCustLedgEntry: Record "Detailed Cust. Ledg. Entry" temporary;
+        TempFatturaLine: Record "Fattura Line" temporary;
+        PreviewAccounting: Codeunit "FatturaPA Preview Accounting";
+    begin
+        // [SCENARIO] An actual zero-valued initial entry is not confused with a missing entry.
+        // [GIVEN] A customer ledger entry with an existing zero-valued initial detailed entry
+        TempCustLedgEntry.Init();
+        TempCustLedgEntry."Entry No." := 101;
+        TempCustLedgEntry.Insert();
+        TempDtldCustLedgEntry.Init();
+        TempDtldCustLedgEntry."Entry No." := 1;
+        TempDtldCustLedgEntry."Cust. Ledger Entry No." := 101;
+        TempDtldCustLedgEntry."Entry Type" := TempDtldCustLedgEntry."Entry Type"::"Initial Entry";
+        TempDtldCustLedgEntry.Amount := 0;
+        TempDtldCustLedgEntry.Insert();
+
+        // [WHEN] Payment rows are prepared
+        PreviewAccounting.AddPaymentRows(TempFatturaLine, TempCustLedgEntry, TempDtldCustLedgEntry);
+
+        // [THEN] The existing zero amount is faithfully preserved
+        TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Payment);
+        Assert.AreEqual(1, TempFatturaLine.Count(), 'Expected the zero-valued initial entry to produce its payment row.');
+        Assert.IsTrue(TempFatturaLine.FindFirst(), 'Payment row was not created.');
+        Assert.AreEqual(0, TempFatturaLine.Amount, 'Actual zero initial entry amount was changed.');
+    end;
+
+    [Test]
+    procedure PreviewRejectsMissingReferencedSalesShipment()
+    var
+        TempFatturaLine: Record "Fattura Line" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        // [SCENARIO] A nonblank DDT reference must resolve to a real shipment header.
+        // [GIVEN] A shipment number that does not exist
+        // [WHEN] The FatturaPA preparation tries to add that shipment reference
+        asserterror FatturaDocHelper.InsertSalesShipmentReference(
+            TempFatturaLine, 'NO-SHIPMENT-TEST', 1, false);
+
+        // [THEN] The missing fiscal source cannot be silently ignored
+        Assert.ExpectedError('Sales shipment');
+        Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Missing shipment must not generate a DDT reference.');
+    end;
+
+    [Test]
     procedure PreviewRejectsBlankProgressiveNo()
     var
         SalesHeader: Record "Sales Header";
@@ -236,7 +305,7 @@ codeunit 144200 "FatturaPA Test"
 
     [Test]
     [TransactionModel(TransactionModel::AutoCommit)]
-    procedure PreviewXMLDoesNotAdvanceFatturaPANumberSeries()
+    procedure TempPreviewXMLDoesNotAdvanceFatturaPANumberSeries()
     var
         SalesHeader: Record "Sales Header";
         FatturaPANoSeries: Record "No. Series Line";
@@ -588,8 +657,9 @@ codeunit 144200 "FatturaPA Test"
     [TransactionModel(TransactionModel::AutoCommit)]
     procedure PreviewIncludesKnownCustomerOrderMetadata()
     var
-        FatturaProjectInfo: Record "Fattura Project Info";
         SalesHeader: Record "Sales Header";
+        FatturaProjectCode: Code[15];
+        FatturaTenderCode: Code[15];
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
         FatturaPAPreviewMgt: Codeunit "FatturaPA Preview Mgt.";
@@ -598,18 +668,12 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(),
             CreateCustomer(), SalesHeader."Document Type"::Order);
-        FatturaProjectInfo.Init();
-        FatturaProjectInfo.Code := 'CUP-TEST';
-        FatturaProjectInfo.Type := FatturaProjectInfo.Type::Project;
-        FatturaProjectInfo.Insert();
-        FatturaProjectInfo.Init();
-        FatturaProjectInfo.Code := 'CIG-TEST';
-        FatturaProjectInfo.Type := FatturaProjectInfo.Type::Tender;
-        FatturaProjectInfo.Insert();
+        FatturaProjectCode := LibraryITLocalization.CreateFatturaProjectCode();
+        FatturaTenderCode := LibraryITLocalization.CreateFatturaTenderCode();
 
         SalesHeader.Validate("Customer Purchase Order No.", 'CUSTOMER-PO-TEST');
-        SalesHeader.Validate("Fattura Project Code", 'CUP-TEST');
-        SalesHeader.Validate("Fattura Tender Code", 'CIG-TEST');
+        SalesHeader.Validate("Fattura Project Code", FatturaProjectCode);
+        SalesHeader.Validate("Fattura Tender Code", FatturaTenderCode);
         SalesHeader.Modify(true);
 
         Commit();
@@ -617,8 +681,8 @@ codeunit 144200 "FatturaPA Test"
         TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Order);
         Assert.IsTrue(TempFatturaLine.FindFirst(), 'Preview is missing source purchase-order metadata.');
         Assert.AreEqual('CUSTOMER-PO-TEST', TempFatturaLine."Customer Purchase Order No.", 'Customer PO differs.');
-        Assert.AreEqual('CUP-TEST', TempFatturaLine."Fattura Project Code", 'CUP differs.');
-        Assert.AreEqual('CIG-TEST', TempFatturaLine."Fattura Tender Code", 'CIG differs.');
+        Assert.AreEqual(FatturaProjectCode, TempFatturaLine."Fattura Project Code", 'CUP differs.');
+        Assert.AreEqual(FatturaTenderCode, TempFatturaLine."Fattura Tender Code", 'CIG differs.');
         TempFatturaLine.SetRange("Line Type", TempFatturaLine."Line Type"::Shipment);
         Assert.IsTrue(TempFatturaLine.IsEmpty(), 'Preview invented a shipment before posting.');
     end;
@@ -1222,7 +1286,7 @@ codeunit 144200 "FatturaPA Test"
         RecipientCustomer: Record Customer;
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
-        PreviewXML: Record "XML Buffer" temporary;
+        TempPreviewXML: Record "XML Buffer" temporary;
         PostedXML: Record "XML Buffer" temporary;
         PreviewBlob: Codeunit "Temp Blob";
         PostedBlob: Codeunit "Temp Blob";
@@ -1260,52 +1324,52 @@ codeunit 144200 "FatturaPA Test"
                 CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
         end;
 
-        LibraryITLocalization.LoadTempXMLBufferFromTempBlob(PreviewXML, PreviewBlob);
+        LibraryITLocalization.LoadTempXMLBufferFromTempBlob(TempPreviewXML, PreviewBlob);
         LibraryITLocalization.LoadTempXMLBufferFromTempBlob(PostedXML, PostedBlob);
 
         // Compare fiscally significant values produced by the same serializer,
         // rather than identifiers assigned by the posting/export workflow.
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/TipoDocumento');
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee/PrezzoUnitario');
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee/PrezzoTotale');
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DettaglioLinee/AliquotaIVA');
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/ImponibileImporto');
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             '/p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta');
-        CompareAdditionalPreviewAndPostedFields(PreviewXML, PostedXML);
+        CompareAdditionalPreviewAndPostedFields(TempPreviewXML, PostedXML);
         // A shipment created by this posting run has no DDT number at preview time.
         // Compare DDTs only when no new shipment is being posted.
         CompareOrderAndShipmentMetadata(
-            PreviewXML, PostedXML,
+            TempPreviewXML, PostedXML,
             (SalesHeader."Document Type" <> SalesHeader."Document Type"::Order) or not SalesHeader.Ship);
     end;
 
     local procedure CompareOrderAndShipmentMetadata(
-        var PreviewXML: Record "XML Buffer" temporary;
+        var TempPreviewXML: Record "XML Buffer" temporary;
         var PostedXML: Record "XML Buffer" temporary;
         CompareShipmentData: Boolean)
     var
         GeneralDataPath: Text;
     begin
         GeneralDataPath := '/p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali';
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/IdDocumento');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCUP');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCIG');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/RiferimentoNumeroLinea');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/IdDocumento');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCUP');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/CodiceCIG');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiOrdineAcquisto/RiferimentoNumeroLinea');
         if not CompareShipmentData then
             exit;
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/NumeroDDT');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/DataDDT');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/RiferimentoNumeroLinea');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/NumeroDDT');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/DataDDT');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, GeneralDataPath + '/DatiDDT/RiferimentoNumeroLinea');
     end;
 
     local procedure CompareAdditionalPreviewAndPostedFields(
-        var PreviewXML: Record "XML Buffer" temporary;
+        var TempPreviewXML: Record "XML Buffer" temporary;
         var PostedXML: Record "XML Buffer" temporary)
     var
         BodyPath: Text;
@@ -1318,66 +1382,66 @@ codeunit 144200 "FatturaPA Test"
         VATPath := BodyPath + '/DatiBeniServizi/DatiRiepilogo';
         PaymentPath := BodyPath + '/DatiPagamento/DettaglioPagamento';
 
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             BodyPath + '/DatiGenerali/DatiGeneraliDocumento/Divisa');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             BodyPath + '/DatiGenerali/DatiGeneraliDocumento/ImportoTotaleDocumento');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML,
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML,
             BodyPath + '/DatiGenerali/DatiGeneraliDocumento/ScontoMaggiorazione/Importo');
-        AssertPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Descrizione');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Quantita');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/UnitaMisura');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/ScontoMaggiorazione/Percentuale');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/ScontoMaggiorazione/Importo');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, LinePath + '/Natura');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, VATPath + '/Natura');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, VATPath + '/EsigibilitaIVA');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, VATPath + '/RiferimentoNormativo');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, PaymentPath + '/DataScadenzaPagamento');
-        AssertOptionalPreviewAndPostedElementEqual(PreviewXML, PostedXML, PaymentPath + '/ImportoPagamento');
+        AssertPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, LinePath + '/Descrizione');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, LinePath + '/Quantita');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, LinePath + '/UnitaMisura');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, LinePath + '/ScontoMaggiorazione/Percentuale');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, LinePath + '/ScontoMaggiorazione/Importo');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, LinePath + '/Natura');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, VATPath + '/Natura');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, VATPath + '/EsigibilitaIVA');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, VATPath + '/RiferimentoNormativo');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, PaymentPath + '/DataScadenzaPagamento');
+        AssertOptionalPreviewAndPostedElementEqual(TempPreviewXML, PostedXML, PaymentPath + '/ImportoPagamento');
     end;
 
     local procedure AssertOptionalPreviewAndPostedElementEqual(
-        var PreviewXML: Record "XML Buffer" temporary;
+        var TempPreviewXML: Record "XML Buffer" temporary;
         var PostedXML: Record "XML Buffer" temporary;
         XPath: Text)
     begin
-        PreviewXML.Reset();
+        TempPreviewXML.Reset();
         PostedXML.Reset();
-        PreviewXML.FindNodesByXPath(PreviewXML, XPath);
+        TempPreviewXML.FindNodesByXPath(TempPreviewXML, XPath);
         PostedXML.FindNodesByXPath(PostedXML, XPath);
-        Assert.AreEqual(PostedXML.Count(), PreviewXML.Count(),
+        Assert.AreEqual(PostedXML.Count(), TempPreviewXML.Count(),
             StrSubstNo('Optional preview/posted XML node counts differ at %1', XPath));
         if PostedXML.IsEmpty() then
             exit;
-        PreviewXML.FindSet();
+        TempPreviewXML.FindSet();
         PostedXML.FindSet();
         repeat
-            Assert.AreEqual(PostedXML.Value, PreviewXML.Value,
+            Assert.AreEqual(PostedXML.Value, TempPreviewXML.Value,
                 StrSubstNo('Optional preview/posted XML values differ at %1', XPath));
             PostedXML.Next();
-        until PreviewXML.Next() = 0;
+        until TempPreviewXML.Next() = 0;
     end;
 
     local procedure AssertPreviewAndPostedElementEqual(
-        var PreviewXML: Record "XML Buffer" temporary;
+        var TempPreviewXML: Record "XML Buffer" temporary;
         var PostedXML: Record "XML Buffer" temporary;
         XPath: Text)
     begin
-        PreviewXML.Reset();
+        TempPreviewXML.Reset();
         PostedXML.Reset();
-        PreviewXML.FindNodesByXPath(PreviewXML, XPath);
+        TempPreviewXML.FindNodesByXPath(TempPreviewXML, XPath);
         PostedXML.FindNodesByXPath(PostedXML, XPath);
-        Assert.IsTrue(PreviewXML.Count() > 0, StrSubstNo('Missing preview XML node %1', XPath));
-        Assert.AreEqual(PostedXML.Count(), PreviewXML.Count(),
+        Assert.IsTrue(TempPreviewXML.Count() > 0, StrSubstNo('Missing preview XML node %1', XPath));
+        Assert.AreEqual(PostedXML.Count(), TempPreviewXML.Count(),
             StrSubstNo('Preview and posted XML node counts differ at %1', XPath));
-        PreviewXML.FindSet();
+        TempPreviewXML.FindSet();
         PostedXML.FindSet();
         repeat
-            Assert.AreEqual(PostedXML.Value, PreviewXML.Value,
+            Assert.AreEqual(PostedXML.Value, TempPreviewXML.Value,
                 StrSubstNo('Preview and posted FatturaPA differ at %1', XPath));
             PostedXML.Next();
-        until PreviewXML.Next() = 0;
+        until TempPreviewXML.Next() = 0;
     end;
 
     [Test]
@@ -1425,7 +1489,7 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::"Credit Memo");
         Commit(); // Make test document visible to posting preview.
-        VerifyPreparedPreviewXML(SalesHeader, 'TD04');
+        VerifyPreparedTempPreviewXML(SalesHeader, 'TD04');
     end;
 
     [Test]
@@ -1438,10 +1502,10 @@ codeunit 144200 "FatturaPA Test"
         CreateSalesDocument(
             SalesHeader, CreatePaymentMethod(), CreatePaymentTerms(), CreateCustomer(), SalesHeader."Document Type"::Order);
         Commit(); // Make test document visible to posting preview.
-        VerifyPreparedPreviewXML(SalesHeader, 'TD01');
+        VerifyPreparedTempPreviewXML(SalesHeader, 'TD01');
     end;
 
-    local procedure VerifyPreparedPreviewXML(SalesHeader: Record "Sales Header"; ExpectedFatturaDocumentType: Text)
+    local procedure VerifyPreparedTempPreviewXML(SalesHeader: Record "Sales Header"; ExpectedFatturaDocumentType: Text)
     var
         TempFatturaHeader: Record "Fattura Header" temporary;
         TempFatturaLine: Record "Fattura Line" temporary;
