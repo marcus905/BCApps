@@ -5,7 +5,6 @@ using Microsoft.Finance.Currency;
 using Microsoft.Finance.VAT.Ledger;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
-using Microsoft.Sales.History;
 using Microsoft.Sales.Receivables;
 
 codeunit 12285 "FatturaPA Preview Mgt."
