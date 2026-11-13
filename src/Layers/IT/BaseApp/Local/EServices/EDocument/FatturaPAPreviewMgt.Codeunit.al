@@ -5,8 +5,8 @@ using Microsoft.Finance.Currency;
 using Microsoft.Finance.VAT.Ledger;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
-using Microsoft.Sales.Receivables;
 using Microsoft.Sales.History;
+using Microsoft.Sales.Receivables;
 
 codeunit 12285 "FatturaPA Preview Mgt."
 {
@@ -157,8 +157,6 @@ codeunit 12285 "FatturaPA Preview Mgt."
         var TempFatturaLine: Record "Fattura Line" temporary)
     var
         SalesLine: Record "Sales Line";
-        SalesShipmentLine: Record "Sales Shipment Line";
-        SalesShipmentHeader: Record "Sales Shipment Header";
         TempShipmentBuffer: Record "Fattura Line" temporary;
         FatturaDocHelper: Codeunit "Fattura Doc. Helper";
         HasShipmentReference: Boolean;
