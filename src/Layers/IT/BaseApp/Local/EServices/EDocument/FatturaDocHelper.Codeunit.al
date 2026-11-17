@@ -529,6 +529,7 @@ codeunit 12184 "Fattura Doc. Helper"
             InvalidISOCountryCodeErrorInfo.Message := InvalidISOCountryCodeErr;
             InvalidISOCountryCodeErrorInfo.DetailedMessage := StrSubstNo(InvalidISOCountryCodeDetailsLbl, CountryRegion.Code);
             InvalidISOCountryCodeErrorInfo.RecordId := CountryRegion.RecordId;
+            InvalidISOCountryCodeErrorInfo.FieldNo := CountryRegion.FieldNo("ISO Code");
             InvalidISOCountryCodeErrorInfo.PageNo := Page::"Countries/Regions";
             InvalidISOCountryCodeErrorInfo.AddNavigationAction(ShowCountryRegionLbl);
             Error(InvalidISOCountryCodeErrorInfo);
