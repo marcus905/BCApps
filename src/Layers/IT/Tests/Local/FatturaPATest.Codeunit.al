@@ -1346,6 +1346,30 @@ codeunit 144200 "FatturaPA Test"
 
     [Test]
     [Scope('OnPrem')]
+    procedure IsSameISOCountryRejectsInvalidCompanyISOCode()
+    var
+        CompanyInformation: Record "Company Information";
+        Customer: Record Customer;
+        CountryRegion: Record "Country/Region";
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+    begin
+        // [SCENARIO] Invalid company country setup cannot be classified as domestic.
+        Initialize();
+        CompanyInformation.Get();
+        Customer.Get(CreateCustomer());
+        LibraryERM.CreateCountryRegion(CountryRegion);
+        CountryRegion."ISO Code" := 'X';
+        CountryRegion.Modify();
+        CompanyInformation."Country/Region Code" := CountryRegion.Code;
+        CompanyInformation.Modify();
+
+        asserterror FatturaDocHelper.IsSameISOCountry(Customer."Country/Region Code", CompanyInformation."Country/Region Code");
+
+        Assert.ExpectedError('The Country/Region must have a two-character ISO Code for FatturaPA.');
+    end;
+
+    [Test]
+    [Scope('OnPrem')]
     procedure CheckMandatoryFieldsLogsInvalidCustomerISOCountryCode()
     var
         Customer: Record Customer;
