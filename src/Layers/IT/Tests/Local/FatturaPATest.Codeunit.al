@@ -1407,6 +1407,45 @@ codeunit 144200 "FatturaPA Test"
 
     [Test]
     [Scope('OnPrem')]
+    procedure CheckMandatoryFieldsLogsInvalidCompanyISOCountryCode()
+    var
+        CompanyInformation: Record "Company Information";
+        Customer: Record Customer;
+        CountryRegion: Record "Country/Region";
+        SalesInvoiceHeader: Record "Sales Invoice Header";
+        TempErrorMessage: Record "Error Message" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
+        DocumentRecRef: RecordRef;
+        DocumentNo: Code[20];
+    begin
+        // [SCENARIO] Invalid company country setup is logged against Company Information.
+        Initialize();
+
+        Customer.Get(CreateCustomer());
+        DocumentNo := CreateAndPostSalesInvoice(DocumentRecRef, CreatePaymentMethod(), CreatePaymentTerms(), Customer."No.");
+        SalesInvoiceHeader.Get(DocumentNo);
+        CompanyInformation.Get();
+        LibraryERM.CreateCountryRegion(CountryRegion);
+        CountryRegion."ISO Code" := 'X';
+        CountryRegion.Modify();
+        CompanyInformation."Country/Region Code" := CountryRegion.Code;
+        CompanyInformation.Modify();
+
+        DocumentRecRef.GetTable(SalesInvoiceHeader);
+        FatturaDocHelper.CheckMandatoryFields(DocumentRecRef, TempErrorMessage);
+
+        TempErrorMessage.SetRange("Record ID", CompanyInformation.RecordId);
+        TempErrorMessage.SetRange("Field Number", CompanyInformation.FieldNo("Country/Region Code"));
+        TempErrorMessage.SetRange("Message Type", TempErrorMessage."Message Type"::Error);
+        Assert.RecordIsNotEmpty(TempErrorMessage);
+        TempErrorMessage.FindFirst();
+        Assert.AreEqual(
+          'The Country/Region must have a two-character ISO Code for FatturaPA.',
+          TempErrorMessage.Message, 'Invalid ISO country error must be logged against the company.');
+    end;
+
+    [Test]
+    [Scope('OnPrem')]
     procedure ExportSalesInvoiceTreatsMatchingISOCountriesAsDomestic()
     var
         CompanyInformation: Record "Company Information";
