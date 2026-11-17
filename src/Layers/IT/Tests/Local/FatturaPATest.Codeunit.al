@@ -1346,31 +1346,39 @@ codeunit 144200 "FatturaPA Test"
 
     [Test]
     [Scope('OnPrem')]
-    procedure ExportSalesInvoiceRejectsInvalidCustomerISOCountryCode()
+    procedure CheckMandatoryFieldsLogsInvalidCustomerISOCountryCode()
     var
         Customer: Record Customer;
         CountryRegion: Record "Country/Region";
         SalesInvoiceHeader: Record "Sales Invoice Header";
-        TempBlob: Codeunit "Temp Blob";
+        TempErrorMessage: Record "Error Message" temporary;
+        FatturaDocHelper: Codeunit "Fattura Doc. Helper";
         DocumentRecRef: RecordRef;
-        ClientFileName: Text[250];
+        DocumentNo: Code[20];
     begin
-        // [SCENARIO] FatturaPA export stops when customer setup has an invalid ISO country.
+        // [SCENARIO] Invalid country setup is logged against the customer instead of being classified as domestic.
         Initialize();
 
         Customer.Get(CreateCustomer());
-        SalesInvoiceHeader.SetRange(
-          "No.", CreateAndPostSalesInvoice(DocumentRecRef, CreatePaymentMethod(), CreatePaymentTerms(), Customer."No."));
+        DocumentNo := CreateAndPostSalesInvoice(DocumentRecRef, CreatePaymentMethod(), CreatePaymentTerms(), Customer."No.");
+        SalesInvoiceHeader.Get(DocumentNo);
         LibraryERM.CreateCountryRegion(CountryRegion);
         CountryRegion."ISO Code" := 'X';
         CountryRegion.Modify();
         Customer."Country/Region Code" := CountryRegion.Code;
         Customer.Modify(true);
 
-        asserterror ElectronicDocumentFormat.SendElectronically(
-          TempBlob, ClientFileName, SalesInvoiceHeader, CopyStr(FatturaPA_ElectronicFormatTxt, 1, 20));
+        DocumentRecRef.GetTable(SalesInvoiceHeader);
+        FatturaDocHelper.CheckMandatoryFields(DocumentRecRef, TempErrorMessage);
 
-        Assert.ExpectedError('The Country/Region must have a two-character ISO Code for FatturaPA.');
+        TempErrorMessage.SetRange("Record ID", Customer.RecordId);
+        TempErrorMessage.SetRange("Field Number", Customer.FieldNo("Country/Region Code"));
+        TempErrorMessage.SetRange("Message Type", TempErrorMessage."Message Type"::Error);
+        Assert.RecordIsNotEmpty(TempErrorMessage);
+        TempErrorMessage.FindFirst();
+        Assert.AreEqual(
+          'The Country/Region must have a two-character ISO Code for FatturaPA.',
+          TempErrorMessage.Message, 'Invalid ISO country error must be logged against the customer.');
     end;
 
     [Test]
